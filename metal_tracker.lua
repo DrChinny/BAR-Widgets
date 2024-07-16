@@ -8,7 +8,8 @@ function widget:GetInfo()
       enabled   = true
     }
 end
---V.0.1
+--V0.1 Initial release
+--V0.2 Added buttons/graphics to hide names and/or when 0 metal has been sent, reset resources and include shared units values. Included Xoffset,
 ---------------------------------------------------------------------------------
 --Use
 ---------------------------------------------------------------------------------
@@ -38,7 +39,9 @@ end
 local custom_keybind_mode       = false -- Set to true for custom keybind, false for hotkeys defined in this code.
 local hotkeys                   = {106} -- Alt-j bound. Only needed if custom_keybind_mode is set false. For Reference: 106 = j .Shift/Alt requirements must be changed on keypress function 
 local defaultOn                 = true  -- show widgetgraphics on game start?
-
+local clickedButtonCombined     = false -- show transfered units resources in the stats
+local clickedButtonHideZero     = false
+local clickedButtonShowAll      = false
 ---------------------------------------------------------------------------------
 --Drawing and Scaling
 ---------------------------------------------------------------------------------
@@ -49,9 +52,16 @@ local fontSizeDefault           = vsx/96 -- Want to be 20 for 1920 screen. (1920
 local fontSize                  = fontSizeDefault * uiScale
 local yPadding                  = math.floor(fontSize/5) --Space between rows
 local xPadding                  = math.floor(fontSize/2) --Space away from edge of screen
+local buttonCombinedCoords      = {} --- {Xl,Yb,Xr,Yt}
+local buttonColour      = {{{1,1,1,0.3},{0.5,0.5,0.5,0.3}},{{0,0,0,0.3},{0.5,0.5,0.5,0.3}}} --on/off and blend
 
-local offsetX, offsetY          = 8,80 --Enough to avoid overlap of other right side menus, can be altered in settings
-local nameStringWidth,metalStringWidth,unitStringWidth,otherStringWidth, maxStringWidth = 1,1,1,1,1 --string widths
+local buttonNameCoords          = {} --- {Xl,Yb,Xr,Yt}
+local buttonHideZeroCoords      = {} --- {Xl,Yb,Xr,Yt}
+local buttonShowAllCoords       = {} --- {Xl,Yb,Xr,Yt}
+local buttonResetZeroCoords     = {} --- {Xl,Yb,Xr,Yt}
+
+local offsetX, offsetY          = -8,80 --Enough to avoid overlap of other right side menus, can be altered in settings
+local nameStringWidth,metalStringWidth,unitStringWidth,otherStringWidth, maxStringWidth = 1,1,1,1, 6.5 --string widths
 local playerListTop,playerListLeft,playerListRight,posX, posY, posXr, posYt --positions of playerlist and this widget, which will sit on top of it
 local boarderWidth              = 6
 local widgetHeight,widgetWidth  = 1,1 --Height/width of the widget, calculated on the go
@@ -89,9 +99,9 @@ local UiElement
 --------------------------------------------------------------------------------
 
 local config                    = {
-        widgetScale = 1,
+        widgetScale = 1, --xxx rest to defaults before commits
         offsetY = 80,
-        offsetX = 20
+        offsetX = -10
 }
 local OPTION_SPECS              = {
     -- TODO: add i18n to the names and descriptions
@@ -114,15 +124,15 @@ local OPTION_SPECS              = {
         step = 16,
     },
 
-    -- {
-    --     configVariable = "offsetX",
-    --     name = "Widget offsetX",
-    --     description = "Screen Position on X axis",
-    --     type = "slider",
-    --     min = -vsx,
-    --     max = 0,
-    --     step = 16,
-    -- },
+    {
+        configVariable = "offsetX",
+        name = "Widget offsetX",
+        description = "Screen Position on X axis",
+        type = "slider",
+        min = -vsx,
+        max = 0,
+        step = 16,
+    },
 }
 
 
@@ -191,7 +201,7 @@ local function PopulateResourceList()
         for i,j in pairs(listof8names) do
             for k,l in pairs(listof8names) do
                 if i~=k then
-                    resourceList[i][k]= {order = l.order, givername = k, metal =0, energy = 0, colour =l.colour}
+                    resourceList[i][k]= {order = l.order, givername = k, metal =0, energy = 0, colour =l.colour ,unitmetal = 0, unitenergy = 0, showplayer =true}
                 end
             end
         end
@@ -244,10 +254,17 @@ local function gdParser(message) --parsers the message into names and numbers
         energyamount = string.sub(energyamount,15, #energyamount)
     else energyamount = 0
     end
-
     return giver, metalamount, energyamount ,receiver
 end
 
+local function GetUnitCost (unitDefID)
+    for a = 1, #UnitDefs do
+        if a == unitDefID then
+            return UnitDefs[a].metalCost,UnitDefs[a].energyCost
+        end
+    end
+    return nil
+end
 --------------------------------------------------------------------------------
 --Drawing Related Functions
 --------------------------------------------------------------------------------
@@ -256,11 +273,11 @@ local function UpdateScales()
     fontSize = fontSizeDefault * uiScale
     xPadding = math.max(fontSizeDefault * uiScale / 2 ,6)
     yPadding = math.max(fontSizeDefault * uiScale / 4 ,2)
-    widgetHeight = #printList * (fontSize + yPadding) + 2*(boarderWidth + yPadding)
-    nameStringWidth = maxStringWidth  * fontSize
-    metalStringWidth= font:GetTextWidth("8888 M  ")*fontSize/2
+    widgetHeight = (#printList +1) * (fontSize + yPadding) + 2*(boarderWidth + yPadding)
+    nameStringWidth = (maxStringWidth  * fontSize)
+    metalStringWidth= font:GetTextWidth("8888 M    ")*fontSize/2
     unitStringWidth = font:GetTextWidth("energy ")*fontSize/2
-    otherStringWidth = font:GetTextWidth(" donated  ")*fontSize/1.33
+    otherStringWidth = font:GetTextWidth("8")*fontSize
     widgetWidth = (nameStringWidth+metalStringWidth+ unitStringWidth +otherStringWidth)+2*(boarderWidth + xPadding)
     
 end
@@ -268,43 +285,59 @@ end
 local function MakePrintList()
     printList = {}
     fontSize = fontSizeDefault * uiScale
-    nameStringWidth = 5
-    maxStringWidth = 5
+    maxStringWidth = 6.5
     local counter = 0
     for givername, list in pairs(resourceList[whoami]) do
-        counter = counter +1
-        local stringWidth = font:GetTextWidth(givername)
-        if  stringWidth > maxStringWidth then
-            maxStringWidth = stringWidth
-        end
-        printList[counter] = {}
-        local metal, energy
-        if list.metal <1000 then
-                metal = string.format("%6s",tostring(string.format("%3d",list.metal)))
-            elseif list.metal <1000000 then
-                metal = string.format("%.5s",tostring(string.format("%.3f",(list.metal / 1000)))).." K"
-            elseif list.metal <1000000000 then
-                metal = string.format("%.5s",tostring(string.format("%.3f",(list.metal / 1000000)))).." M"
+        if list.showplayer == true then
+            if clickedButtonHideZero == true and list.metal == 0 then
             else
-                metal = "TOO MUCH"
-        end
+                counter = counter +1
+                local stringWidth = font:GetTextWidth(givername)
+                if  stringWidth > maxStringWidth then
+                    maxStringWidth = stringWidth
+                end
+                printList[counter] = {}
+                local metal, energy, combinedMetal, combinedEnergy
 
-        if list.energy <1000 then
-            energy = string.format("%6s",tostring(string.format("%3d",list.energy)))
-        elseif list.energy<1000000 then
-            energy = string.format("%.5s",tostring(string.format("%.3f",(list.energy / 1000)))).." K"
-        elseif list.energy<1000000000 then
-            energy = string.format("%.5s",tostring(string.format("%.3f",(list.energy / 1000000)))).." M"
-        else
-            energy = "TOO MUCH"
+                if clickedButtonCombined ==true then
+                    combinedMetal = list.metal + list.unitmetal
+                    combinedEnergy = list.energy + list.unitenergy
+                else
+                    combinedMetal = list.metal
+                    combinedEnergy = list.energy
+                end
+
+                if combinedMetal <1000 then
+                        metal = string.format("%6s",tostring(string.format("%3d",combinedMetal)))
+                    elseif combinedMetal <1000000 then
+                        metal = string.format("%.5s",tostring(string.format("%.3f",(combinedMetal / 1000)))).."K"
+                    elseif combinedMetal <1000000000 then
+                        metal = string.format("%.5s",tostring(string.format("%.3f",(combinedMetal / 1000000)))).."M"
+                    else
+                        metal = ">1M"
+                end
+
+                if combinedEnergy <1000 then
+                    energy = string.format("%6s",tostring(string.format("%3d",combinedEnergy)))
+                elseif combinedEnergy<1000000 then
+                    energy = string.format("%.5s",tostring(string.format("%.3f",(combinedEnergy / 1000)))).."K"
+                elseif combinedEnergy<1000000000 then
+                    energy = string.format("%.5s",tostring(string.format("%.3f",(combinedEnergy / 1000000)))).."M"
+                else
+                    energy = ">1M"
+                end
+                printList[counter].givername = string.sub(givername,1,24)
+                printList[counter].metal = metal
+                printList[counter].energy = energy
+                printList[counter].colour = list.colour
+                printList[counter].order = list.order
+                printList[counter].receivername = whoami
+            end
         end
-        printList[counter].givername = string.sub(givername,1,24)
-        printList[counter].metal = metal
-        printList[counter].energy = energy
-        printList[counter].colour = list.colour
-        printList[counter].order = list.order
     end
-    table.sort(printList, function (a,b) return a["order"] < b["order"] end) --orders in OS
+    if #printList >0 then --XXX THIS MAY BREAK THE GRAPHIC UPDATE CHAIN, NEED TO EXIT SAFELY
+        table.sort(printList, function (a,b) return a["order"] < b["order"] end) --orders in OS
+    end
     UpdateScales()
 end
 
@@ -312,16 +345,17 @@ function UpdatePosition(forceUpdate)
 	if forceUpdate == nil then forceUpdate = false end
 	local newUiScale = config.widgetScale --spGetConfigFloat('ui_scale', 1) or 1
     local newoffsetY = config.offsetY
+    local newoffsetX = config.offsetX
 	local uiScaleChanged = newUiScale ~= uiScale
-    --local offsetXChanged = newoffsetX ~= offsetX
+    local offsetXChanged = newoffsetX ~= offsetX
     local offsetYChanged = newoffsetY ~= offsetY
 
-	if (forceUpdate or uiScaleChanged or offsetYChanged) then --or offsetXChanged
+	if (forceUpdate or uiScaleChanged or offsetYChanged or offsetXChanged) then
         if uiScaleChanged then
 	        uiScale = newUiScale
             updateImage = true
         end
-        --offsetX = newoffsetX
+        offsetX = newoffsetX
         offsetY = newoffsetY
         changedWidgetPos = true
 	end
@@ -348,7 +382,7 @@ function UpdatePosition(forceUpdate)
     local oldposY = posY
     local oldposX = posX
     posY = playerListTop + offsetY
-    posXr = playerListRight - offsetX
+    posXr = playerListRight + offsetX
     posX = posXr - widgetWidth
     posYt = posY + widgetHeight
     if oldposX ~=posX or oldposY ~= posY then
@@ -360,34 +394,81 @@ local function CreateTexture()
     if stuffToDraw then
 		gl_DeleteList(stuffToDraw)
 	end
+    local colour
+    buttonCombinedCoords = {(posXr- boarderWidth - 2.75*fontSize),(posYt-boarderWidth - (2*fontSize) + yPadding),(posXr- boarderWidth - 0  *fontSize),(posYt-boarderWidth)} --button to inc unit costs
+    buttonHideZeroCoords = {(posXr- boarderWidth - 5.5*  fontSize),(posYt-boarderWidth - (2*fontSize) + yPadding),(posXr- boarderWidth - 2.75*fontSize),(posYt-boarderWidth)}--button to hide names with zero metal sent
+    buttonShowAllCoords  = {(posXr- boarderWidth - 8.25*fontSize),(posYt-boarderWidth - (2*fontSize) + yPadding),(posXr- boarderWidth - 5.5  *fontSize),(posYt-boarderWidth)}--button to show all hidden names
+    buttonNameCoords = {} --button /highlight to hide a player
+    buttonResetZeroCoords = {}
     stuffToDraw = gl_CreateList(function()
-        UiElement(posX,posY,posXr,posYt,1,1,1,1, 1,1,1,1, .5, {0,0,0,0.5},{1,1,1,0.05},boarderWidth)
+
+
+        UiElement(posX,posY,posXr,posYt,1,1,1,1, 1,1,1,1, .5, {0,0,0,0.5},{1,1,1,0.05},boarderWidth) --widget outline
+
+        if clickedButtonCombined then --show units button
+            colour = buttonColour[1]
+            font:SetTextColor(0, 0.6, 0, 1)
+            font:SetOutlineColor(0, 0, 0, 1)
+        else
+            colour = buttonColour[2]
+            font:SetTextColor(0.92, 0.92, 0.92, 1)
+            font:SetOutlineColor(0, 0, 0, 1)
+        end
+        UiButton(buttonCombinedCoords[1],buttonCombinedCoords[2],buttonCombinedCoords[3],buttonCombinedCoords[4], 1,1,1,1, 1,1,1,1, nil,colour[1],colour[2],2)
+        font:Print("Inc.Unit", buttonCombinedCoords[1]+((buttonCombinedCoords[3]-buttonCombinedCoords[1])/2),buttonCombinedCoords[2]+((buttonCombinedCoords[4]-buttonCombinedCoords[2])/2)+fontSize/3, fontSize*0.67, "cvos")
+        font:Print("Values",buttonCombinedCoords[1]+((buttonCombinedCoords[3]-buttonCombinedCoords[1])/2),buttonCombinedCoords[2]+((buttonCombinedCoords[4]-buttonCombinedCoords[2])/2)-fontSize/3, fontSize*0.67, "cvos")
+
+        if clickedButtonHideZero then --Hide all Zeross button
+            colour = buttonColour[1]
+            font:SetTextColor(0, 0.6, 0, 1)
+            font:SetOutlineColor(0, 0, 0, 1)
+        else
+            colour = buttonColour[2]
+            font:SetTextColor(0.92, 0.92, 0.92, 1)
+            font:SetOutlineColor(0, 0, 0, 1)
+        end
+        UiButton(buttonHideZeroCoords[1],buttonHideZeroCoords[2],buttonHideZeroCoords[3],buttonHideZeroCoords[4], 1,1,1,1, 1,1,1,1, nil,colour[1],colour[2],2)
+        font:Print("Hide", buttonHideZeroCoords[1]+((buttonHideZeroCoords[3]-buttonHideZeroCoords[1])/2),buttonHideZeroCoords[2]+((buttonHideZeroCoords[4]-buttonHideZeroCoords[2])/2)+fontSize/3, fontSize*0.67, "cvos")
+        font:Print("Zeros",buttonHideZeroCoords[1]+((buttonHideZeroCoords[3]-buttonHideZeroCoords[1])/2),buttonHideZeroCoords[2]+((buttonHideZeroCoords[4]-buttonHideZeroCoords[2])/2)-fontSize/3, fontSize*0.67, "cvos")
+
+        if clickedButtonShowAll then --Show All button
+            colour = buttonColour[1]
+            font:SetTextColor(0, 0.6, 0, 1)
+            font:SetOutlineColor(0, 0, 0, 1)
+        else
+            colour = buttonColour[2]
+            font:SetTextColor(0.92, 0.92, 0.92, 1)
+            font:SetOutlineColor(0, 0, 0, 1)
+        end
+        UiButton(buttonShowAllCoords[1] ,buttonShowAllCoords[2] ,buttonShowAllCoords[3] ,buttonShowAllCoords[4] , 1,1,1,1, 1,1,1,1,nil,colour[1],colour[2],2)
+        font:Print("Reveal",  buttonShowAllCoords[1]+((buttonShowAllCoords[3]-buttonShowAllCoords[1])/2),buttonShowAllCoords[2]+((buttonShowAllCoords[4]-buttonShowAllCoords[2])/2)+fontSize/3, fontSize*0.67, "cvos")
+        font:Print("Hidden",buttonShowAllCoords[1]+((buttonShowAllCoords[3]-buttonShowAllCoords[1])/2),buttonShowAllCoords[2]+((buttonShowAllCoords[4]-buttonShowAllCoords[2])/2)-fontSize/3, fontSize*0.67, "cvos")
         
         for i,list in ipairs(printList) do
+            buttonNameCoords[i] = {posX + boarderWidth, posYt - boarderWidth - (0.5* fontSize) - ((i+1)*(fontSize+yPadding)),posXr - (metalStringWidth + unitStringWidth + otherStringWidth  + xPadding), posYt -(0.5* fontSize)- boarderWidth - ((i)*(fontSize+yPadding)),list.receivername, list.givername }
             font:SetTextColor(list.colour.r,list.colour.g,list.colour.b,1)
-            font:Print(list.givername,posXr - (metalStringWidth + unitStringWidth + otherStringWidth  + xPadding), posYt - boarderWidth - ((i)*(fontSize+yPadding)),fontSize,"rxos") --"rvos"
+            font:Print(list.givername,posXr - (metalStringWidth + unitStringWidth + otherStringWidth  + xPadding), posYt - boarderWidth - ((i+1)*(fontSize+yPadding) +yPadding),fontSize,"rxos") --"rvos"
         end
+
         for i,list in ipairs(printList) do
-            font:SetTextColor(list.colour.r,list.colour.g,list.colour.b,1)
-            font:Print("donated ",posXr - (metalStringWidth + unitStringWidth + xPadding) ,posYt  - boarderWidth+ uiScale- ((i)*(fontSize+yPadding)),fontSize/1.33,"rxos") --uiscale offset centers nicely the text I HAVE NO FUCKING CLUE
-        end
-        
-        for i,list in ipairs(printList) do
-            font:SetTextColor(1,1,1,1) --White
-            font:Print(list.metal,posXr- (metalStringWidth + unitStringWidth + xPadding), posYt  - boarderWidth+ (fontSize-yPadding)/5 - ((i)*(fontSize+yPadding))+yPadding,fontSize/2,"xos")
-        end
-        for i,list in ipairs(printList) do
-            font:SetTextColor(1,1,1,1) --White
-            font:Print("metal",posXr- (metalStringWidth + xPadding), posYt - boarderWidth + (fontSize-yPadding)/5 - ((i)*(fontSize+yPadding))+yPadding,fontSize/2,"xos")
+            font:SetTextColor(0.92, 0.92, 0.92, 1) -- Metal White
+            font:Print(list.metal,posXr- (metalStringWidth + unitStringWidth + xPadding), posYt  - boarderWidth+ (fontSize-yPadding)/5 - ((i+1)*(fontSize+yPadding))+ 0*yPadding,fontSize/2,"xos")
         end
 
         for i,list in ipairs(printList) do
             font:SetTextColor(1,1,0,1) --yellow
-            font:Print(list.energy,posXr- (metalStringWidth + unitStringWidth + xPadding),posYt  - boarderWidth - (fontSize-yPadding)/5- ((i)*(fontSize+ yPadding)),fontSize/2,"xos")
+            font:Print(list.energy, posXr - (metalStringWidth + unitStringWidth + xPadding), posYt  - boarderWidth - (fontSize-yPadding)/5- ((i+1)*(fontSize+ yPadding))-1*yPadding,fontSize/2,"xos")
         end
+
+        for i,list in ipairs(printList) do
+            buttonResetZeroCoords[i] = {posXr - boarderWidth -(metalStringWidth + unitStringWidth + xPadding), posYt - boarderWidth- (0.5* fontSize) - ((i+1)*(fontSize+yPadding)),posXr - boarderWidth- xPadding, posYt - boarderWidth - (0.5* fontSize)- ((i)*(fontSize+yPadding)),list.receivername, list.givername }
+            font:SetTextColor(0.92, 0.92, 0.92, 1) --Metal White
+            font:Print("metal",posXr- (metalStringWidth + xPadding), posYt - boarderWidth + (fontSize-yPadding)/5 - ((i+1)*(fontSize+yPadding))+0*yPadding,fontSize/2,"xos")
+        end
+
         for i,list in ipairs(printList) do
             font:SetTextColor(1,1,0,1) --yellow
-            font:Print("energy",posXr- (metalStringWidth + xPadding),posYt - boarderWidth - (fontSize-yPadding)/5- ((i)*(fontSize+ yPadding)),fontSize/2,"xos")
+            font:Print("energy",posXr- (metalStringWidth + xPadding),posYt - boarderWidth - (fontSize-yPadding)/5- ((i+1)*(fontSize+ yPadding))-1*yPadding,fontSize/2,"xos")
         end
     end)
     stuffToDrawReady = true
@@ -431,6 +512,75 @@ end
 --------------------------------------------------------------------------------
 --BAR Callins
 --------------------------------------------------------------------------------
+function widget:UnitGiven(unitID, unitDefID, newTeam, oldTeam)
+    updateImage = true
+    local giverStr
+    local pidlist= Spring.GetPlayerList(newTeam)
+    local receiverStr = Spring.GetPlayerInfo(pidlist[1])
+    pidlist= Spring.GetPlayerList(oldTeam)
+    if pidlist[1] then --if player specced /resigned they don't have a team. this can therefore be ignored as taken units shouldn't count.
+            giverStr = Spring.GetPlayerInfo(pidlist[1])
+    else
+        return
+    end
+    local metalamount, energyamount = GetUnitCost(unitDefID)
+    if metalamount then
+        if resourceList[receiverStr] then
+            if resourceList[receiverStr][giverStr] then
+                resourceList[receiverStr][giverStr].unitmetal = resourceList[receiverStr][giverStr].unitmetal+metalamount
+                resourceList[receiverStr][giverStr].unitenergy = resourceList[receiverStr][giverStr].unitenergy+energyamount
+            end
+        end
+    end
+end
+
+function widget:MousePress(mx, my, button) --sets the way point if hotkey is pressed and factory type selected.
+    if button == 1 and drawer then
+        if mx >= buttonCombinedCoords[1] and mx <=buttonCombinedCoords[3] and my >=buttonCombinedCoords[2] and my <=buttonCombinedCoords[4] then --xxx could nest all these in a list
+            if not clickedButtonCombined then
+                clickedButtonCombined = true
+                updateImage = true
+            else
+                clickedButtonCombined = false
+                updateImage =true
+            end
+        elseif mx >= buttonHideZeroCoords[1] and mx <=buttonHideZeroCoords[3] and my >=buttonHideZeroCoords[2] and my <=buttonHideZeroCoords[4] then
+            if not clickedButtonHideZero then
+                clickedButtonHideZero = true
+                updateImage = true
+            else
+                clickedButtonHideZero = false
+                updateImage =true
+            end
+        elseif mx >= buttonShowAllCoords[1] and mx <=buttonShowAllCoords[3] and my >=buttonShowAllCoords[2] and my <=buttonShowAllCoords[4] then
+            if not clickedButtonShowAll then
+                clickedButtonShowAll = true
+                for i, j in pairs(resourceList) do
+                    for i2,j2 in pairs(j) do
+                        j2.showplayer =true
+                    end
+                end
+                updateImage = true
+            end
+        end
+        for i, j in ipairs(buttonNameCoords) do
+            if mx >= buttonNameCoords[i][1] and mx <=buttonNameCoords[i][3] and my >=buttonNameCoords[i][2] and my <=buttonNameCoords[i][4] then
+                resourceList[buttonNameCoords[i][5]][buttonNameCoords[i][6]].showplayer = false
+                updateImage =true
+            end
+        end
+        for i, j in ipairs(buttonResetZeroCoords) do
+            if mx >= buttonResetZeroCoords[i][1] and mx <=buttonResetZeroCoords[i][3] and my >=buttonResetZeroCoords[i][2] and my <=buttonResetZeroCoords[i][4] then
+                resourceList[buttonResetZeroCoords[i][5]][buttonResetZeroCoords[i][6]].metal = 0
+                resourceList[buttonResetZeroCoords[i][5]][buttonResetZeroCoords[i][6]].energy = 0
+                resourceList[buttonResetZeroCoords[i][5]][buttonResetZeroCoords[i][6]].unitmetal = 0
+                resourceList[buttonResetZeroCoords[i][5]][buttonResetZeroCoords[i][6]].unitenergy = 0
+                updateImage =true
+            end
+        end
+        
+    end
+end
 function widget:KeyPress(key, mods, isRepeat)
     if not custom_keybind_mode and mods.alt  == true and not isRepeat then
         if hotkeys[1] == key then
@@ -459,8 +609,27 @@ end
 function widget:DrawScreen()
     if drawer == true and stuffToDrawReady == true then
         gl_CallList(stuffToDraw)
-    end
+        local mx, my, b = Spring.GetMouseState()
+        for i, j in ipairs(buttonNameCoords) do
+            if mx >= buttonNameCoords[i][1] and mx <=buttonNameCoords[i][3] and my >=buttonNameCoords[i][2] and my <=buttonNameCoords[i][4] then
+                UiSelectHighlight(buttonNameCoords[i][1],buttonNameCoords[i][2],buttonNameCoords[i][3],buttonNameCoords[i][4],nil,0.2,nil)
+            end
+        end
+        for i, j in ipairs(buttonResetZeroCoords) do
+            if mx >= buttonResetZeroCoords[i][1] and mx <=buttonResetZeroCoords[i][3] and my >=buttonResetZeroCoords[i][2] and my <=buttonResetZeroCoords[i][4] then
+                UiSelectHighlight(buttonResetZeroCoords[i][1],buttonResetZeroCoords[i][2],buttonResetZeroCoords[i][3],buttonResetZeroCoords[i][4],nil,0.2,nil)
+            end
+        end
+        if mx >= buttonShowAllCoords[1] and mx <=buttonShowAllCoords[3] and my >=buttonShowAllCoords[2] and my <=buttonShowAllCoords[4] then
+            UiSelectHighlight(buttonShowAllCoords[1],buttonShowAllCoords[2],buttonShowAllCoords[3],buttonShowAllCoords[4],nil,0.2,nil)
 
+        elseif mx >= buttonHideZeroCoords[1] and mx <=buttonHideZeroCoords[3] and my >=buttonHideZeroCoords[2] and my <=buttonHideZeroCoords[4] then
+            UiSelectHighlight(buttonHideZeroCoords[1],buttonHideZeroCoords[2],buttonHideZeroCoords[3],buttonHideZeroCoords[4],nil,0.2,nil)
+
+        elseif mx >= buttonCombinedCoords[1] and mx <=buttonCombinedCoords[3] and my >=buttonCombinedCoords[2] and my <=buttonCombinedCoords[4] then
+            UiSelectHighlight(buttonCombinedCoords[1],buttonCombinedCoords[2],buttonCombinedCoords[3],buttonCombinedCoords[4],nil,0.2,nil)
+        end
+    end
 end
 
 function widget:Update(dt)
@@ -472,6 +641,9 @@ function widget:Update(dt)
         updateImage = true
 	end
     if updateCounter % 100 == 0 then
+        if clickedButtonShowAll == true then 
+            clickedButtonShowAll = false
+        end
         UpdatePosition(false)
         if changedWidgetPos == true then
             changedWidgetPos = false
@@ -491,6 +663,8 @@ function widget:Initialize()
 
     font =  WG['fonts'].getFont(fontfile2, 1.0, math.max(0.16, 0.25 / uiScale), math.max(4.5, 6 / uiScale))
     UiElement = WG.FlowUI.Draw.Element
+    UiButton = WG.FlowUI.Draw.Button
+    UiSelectHighlight = WG.FlowUI.Draw.SelectHighlight
     myTeamID = Spring.GetMyTeamID()
     whoami = Spring.GetPlayerInfo(myTeamID,false)
     if WG['options'] ~= nil then
