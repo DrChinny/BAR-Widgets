@@ -14,16 +14,19 @@ end
 --V0.1 Initial release
 --V0.2 Added buttons/graphics to hide names and/or when 0 metal has been sent, reset resources and include shared units values. Included Xoffset,
 --V0.3 Added MinimalistMode, added saving of options between games, added sent resource as tool tip, fomratting changes.
+--v0.4 Fixed bug when Spectatoring Gaia/scavs. Added new setting allowing Top position the of list stay constant, rather than bottom. Added second hotkey to hide/unhide widget
 
 --TODO
 -- Max length of list for V.large team, or add pages.
 -- Reformat if energy is to be hidden. Add toggle or setting to hide energy.
 -- Improve minimalist mode header space.
+-- Check if advanced mex is completed before adding to shared resource.
 
 --BUGS/FUTURE work:
 --Check scavs, raptors etc,
 --Play test what happens when unusaul team changes occur (eg archon mode)
 --Some of the code is VERY wasteful and repeating, go through and clean up.
+--Refine ConstantPosition setting to keep top position consistant.
 
 ---------------------------------------------------------------------------------
 --Use
@@ -40,8 +43,9 @@ end
 --              Minimalist: Starts invisible, Only shows the player who have sent you metal. Reduced Functionality - no buttons or name hiding. Can still reset an individual player's metal to 0
 --              Off:        Widget display off, will still track metal in background for when turned on"         
 --If in spec, it will keep track of each player of all teams. However it cannot track what has happened during the game on enemy team(s) should you be playing then resign/spec.
---There are scaling and position options in the settings screen for custom widgets.
+--There are scaling and position options in the settings screen for custom widgets. If you want the list to appear above the playerlist leave everything as it is. If you want it to appear to the side of the player list enable constant positions and use the offesets to position.
 
+-- Limits: The widget can only calculate what it sees (allies). Transfering stuff back and forward will accumlate for both players. Taking over a players team if they havent resigned will result in a huge transfer of unit wealth.
 
 
 ---------------------------------------------------------------------------------
@@ -49,7 +53,7 @@ end
 ---------------------------------------------------------------------------------
 
 local custom_keybind_mode       = false --  Set to true for custom keybind, false for hotkeys defined in this code. xxx Always change to false before release.
-local hotkeys                   = {106} -- Alt-j bound. Only needed if custom_keybind_mode is set false. For Reference: 106 = j .Shift/Alt requirements must be changed on keypress function 
+local hotkeys                   = {106,107} -- Alt-j /Alt-k bound. Only needed if custom_keybind_mode is set false. For Reference: 106 = j .Shift/Alt requirements must be changed on keypress function 
 local hideEnergy                = false -- This will remove any displayed Energy. Currently only changable with this value.
 ---------------------------------------------------------------------------------
 --Drawing and Scaling
@@ -61,6 +65,8 @@ local fontSizeDefault           = vsx/96 -- Want to be 20 for 1920 screen. (1920
 local fontSize                  = fontSizeDefault * uiScale
 local yPadding                  = math.floor(fontSize/5) --Space between rows
 local xPadding                  = math.floor(fontSize/2) --Space away from edge of screen
+local downListY                 = 0 -- A sneaky little Guy I can use to bodge the loading of a list to keep the top position constant (eg load downwards)
+local downListOn                = false
 
 local buttonColour      = {{{1,1,1,0.3},{0.5,0.5,0.5,0.3}},{{0,0,0,0.3},{0.5,0.5,0.5,0.3}}} --on/off and blend
 local buttonCombinedCoords      = {} --- {Xl,Yb,Xr,Yt}
@@ -96,6 +102,7 @@ local settingChangeTextureReady = false
 local settingChanged            = true
 local settingChangedFlag        = false
 local currentMode               = "Full"
+local storedMode                = "Full"
 --------------------------------------------------------------------------------
 --Running Functions
 --------------------------------------------------------------------------------
@@ -104,8 +111,9 @@ local printList                 = {} --Formatted list of things to print to scre
 local whoami                         --Playername i am/or am speccing
 local myTeamID                       --Will be the ID of me, or the person I am speccing
 local allyTeamList              = {} --Contains list of of all players on each (ally)team. indexed by allyteamID+1 so as to avoid 0
+local gaiaTeamId                = Spring.GetGaiaTeamID()
 local resourceList              = {} --Main table with all name /givers, created and populated once on game start.
-
+local firstIni                  
 --------------------------------------------------------------------------------
 --  speedups?
 --------------------------------------------------------------------------------
@@ -123,7 +131,8 @@ local config                    = {
         widgetScale = 1, 
         offsetY = 80,
         offsetX = -10,
-        MinimalistMode = "Full"
+        MinimalistMode = "Full",
+        ConstantPosition = false
 }
 local OPTION_SPECS              = {
     -- TODO: add i18n to the names and descriptions
@@ -137,7 +146,7 @@ local OPTION_SPECS              = {
         step = 0.05,
     },
     {
-        configVariable = "MinimalistMode",
+        configVariable = "MinimalistMode", --xxx update hotkey string
         name = "Minimalist Mode",
         description = "Widget Appearence and features, cycle with ".."HOTKEY".."\nFull: Start Maximised with full functionality.\nLight: Start minimised with fully functionality.\nMinimalist: Invisible unless you are sent metal, and no buttons, can only reset an individual metal to 0\nOff: Widget display off, will still track metal in background.",
         type = "select",
@@ -163,6 +172,13 @@ local OPTION_SPECS              = {
         max = 0,
         step = vsx / 192,
     },
+
+    {
+        configVariable = "ConstantPosition",
+        name = "Bottom or Top",
+        description = "If enabled, keeps the Top of widget of the widget fixed, as opposed to Bottom of the widget",
+        type = "bool"
+    }
 }
 
 
@@ -385,6 +401,7 @@ end
 
 function UpdatePosition(forceUpdate)
 	if forceUpdate == nil then forceUpdate = false end
+    downListOn = config.ConstantPosition
 	local newUiScale = config.widgetScale
     local newoffsetY = config.offsetY
     local newoffsetX = config.offsetX
@@ -425,7 +442,12 @@ function UpdatePosition(forceUpdate)
 	end
     local oldposY = posY
     local oldposX = posX
-    posY = playerListTop + offsetY
+    if downListOn then
+        downListY = #printList * (fontSize + yPadding)
+    else
+        downListY = 0
+    end
+    posY = playerListTop + offsetY - downListY
     posXr = playerListRight + offsetX
     posX = posXr - widgetWidth
     posYt = posY + widgetHeight
@@ -550,10 +572,13 @@ end
 --------------------------------------------------------------------------------
 --Hotkeys / Controls
 --------------------------------------------------------------------------------
-local function ShowWidget(show)
+local function ShowWidget(show,t)
     if show then
+        if not firstIni then
         UpdatePosition()
         CreateTexture()
+        firstIni = false
+        end
         drawer= true
     else
         drawer = false
@@ -605,6 +630,22 @@ local function ModeChange(update)
         end
     else 
         newMode = currentMode
+    end
+    config.MinimalistMode = newMode
+    CheckMode(newMode)
+    currentMode = newMode
+end
+
+local function ModeChangeOnOff(update)
+    local newMode
+    currentMode = config.MinimalistMode
+    if update then
+        if currentMode == "Off" then
+            newMode = storedMode
+        else
+            newMode = "Off"
+            storedMode = currentMode
+        end
     end
     config.MinimalistMode = newMode
     CheckMode(newMode)
@@ -709,6 +750,8 @@ function widget:KeyPress(key, mods, isRepeat)
     if not custom_keybind_mode and mods.alt  == true and not isRepeat then
         if hotkeys[1] == key then
             ModeChange(true)
+        elseif hotkeys[2] ==key then
+            ModeChangeOnOff(true) 
         end
      end
 end
@@ -771,9 +814,13 @@ function widget:Update(dt) --This is currently bloody wasteful, I'm calling the 
         ModeChange(false)
     end
 	if Spring.GetMyTeamID() ~= prevMyTeamID then --check if the team that we are spectating/on changed
-        myTeamID = Spring.GetMyTeamID()
-        whoami,_,_,_,_,_,_,_,_ = Spring.GetPlayerInfo(myTeamID,false)
-        updateImage = true
+        if not allyTeamList[Spring.GetMyAllyTeamID()+1] then
+            --Spring.Echo("I AM GAIA TEAM WHY AM I GAIA?",Spring.GetMyTeamID())
+        else
+            myTeamID = Spring.GetMyTeamID()
+            whoami,_,_,_,_,_,_,_,_ = Spring.GetPlayerInfo(myTeamID,false)
+            updateImage = true
+        end
 	end
     if updateCounter % 100 == 0 then
         if clickedButtonShowAll == true then 
@@ -807,7 +854,6 @@ end
 function widget:Initialize()
     widgetHandler.actionHandler:AddAction(self, "metal_tracker", MetalAction, { true }, "pR")
     widgetHandler.actionHandler:AddAction(self, "metal_tracker", MetalAction, { false }, "r")
-    
     font =  WG['fonts'].getFont(fontfile2, 1.0, math.max(0.16, 0.25 / uiScale), math.max(4.5, 6 / uiScale))
     UiElement = WG.FlowUI.Draw.Element
     UiButton = WG.FlowUI.Draw.Button
@@ -816,11 +862,21 @@ function widget:Initialize()
     whoami = Spring.GetPlayerInfo(myTeamID,false)
     settingChangedFlag = true
     currentMode = config.MinimalistMode
+    if currentMode ~= "Off" then storedMode = currentMode end
     if WG['options'] ~= nil then
         WG['options'].addOptions(table.map(OPTION_SPECS, createOptionFromSpec))
     end
     FindAllPlayersOnAllyTeam()
     PopulateResourceList()
+    if not allyTeamList[Spring.GetMyAllyTeamID()+1] then
+        --Spring.Echo("INIT: I AM GAIA TEAM WHY AM I GAIA?",Spring.GetMyTeamID())
+        myTeamID = 0 --this should always be a player ID (except in AIvAI??), default to it for saftey
+        whoami,_,_,_,_,_,_,_,_ = Spring.GetPlayerInfo(myTeamID,false)
+    else
+        myTeamID = Spring.GetMyTeamID()
+        whoami,_,_,_,_,_,_,_,_ = Spring.GetPlayerInfo(myTeamID,false)
+    end
+    firstIni = true
     CheckMode()
     InitGraphicUpdate()
 end
