@@ -513,23 +513,22 @@ end
 Notice first that we are creating a variable called healthToDraw outside of the function, we will set this to be the gl list we are creating. Inside the function, we declare it as `gl.CreateList(function()` which has an open ended bracket, and contains a `function()`. This bracket is closed after the first end, which represents the end of the function. We will put our code presenting the hit points between these.
 At the beginning of the function, we also are checking if our gl list exists, and if it does deleting the whole thing and then making a new one (with updated info).
 
-### Using font Widget:
+### Using the Font Widget:
 Writing characters to screen in openGL directly is expensive. It's better to turn them into a texture and display that instead. Another widget deals with this for us without us needing to think about it. We need to reference the font widget when our widget loads. This is done in function `widget:Initialize()` - code that will run only once when the game is loaded and we have joined it, or when the widget it first turned on.
 We will load a widget called 'fonts' which sets everything up, and we load a font from a list of BAR fonts shipped with the game through the widget. We don't need to know how or why this works right now, but you can look at the code in the font widget.
 ```lua
-local fontfile2                 = "fonts/" .. Spring.GetConfigString("bar_font2", "Exo2-SemiBold.otf") --This is the font, its stored in the BAR directly if you want to check it.
-
+local fontfile2 = "fonts/" .. Spring.GetConfigString("bar_font2", "Exo2-SemiBold.otf") --This is the font, its stored in the BAR directly if you want to check it.
+local font
 function widget:Initialize()
     font =  WG['fonts'].getFont(fontfile2, 1.0, 0.25, 6) --xxx add argument meanings
 end
 ```
 
-After this, we can add some code that will help us display our hit points of commanders. We also need to choose a few values for positions and font size. For now, we will just get it working with placeholders, but we will need to come back and change this to be proportional to the user screen size and UI scales.
+After this, we can add some code that will help us display our hit points of commanders. We also need to choose a few values for positions and font size. We will need to come back and change the fixed values to be proportional to the user screen size and UI scales.
 
 ```lua
-local posX,posZ = 512,512 --should be visable somewhere on screen (unless you have a very strange resolution - you will deal with it later.)
+local posX,posZ = 512,512 --This Should be visable somewhere on screen (unless you have a very strange resolution - you will deal with it later.)
 local fontsize = 20
-
 local function CreateHealthInfoTexture()
     if healthToDraw then
 		gl.DeleteList(healthToDraw)
@@ -564,6 +563,8 @@ To do this we will check if the commander unit health (or max health due to prom
 Altogether, our (nearly completed) code will look like this.
 
 ```lua
+local font
+local fontfile2 = "fonts/" .. Spring.GetConfigString("bar_font2", "Exo2-SemiBold.otf")
 local myTeamID = Spring.GetMyTeamID() --We will move this to init later.
 local myCommanderTable = {}
 local commanderDefIDsList = {}
@@ -613,6 +614,10 @@ function PopulateCommanderHealthTable()
     end
 end
 
+function widget:Initialize()
+    font =  WG['fonts'].getFont(fontfile2, 1.0, 0.25, 6) --xxx add argument meanings
+end
+
 
 ```
 ## Display graphics on screen.
@@ -643,13 +648,14 @@ function widget:GetInfo()
     return {
       name      = "Commander Health",
       desc      = "Tutorial Commander Health",
-      author    = "Mr_Chinny",
-      date      = "July 2024",
-      handler   = true,
+      author    = "Your_Name",
+      date      = "Aug 2024",
       enabled   = true
     }
 end
 
+local font
+local fontfile2 = "fonts/" .. Spring.GetConfigString("bar_font2", "Exo2-SemiBold.otf")
 local myTeamID = Spring.GetMyTeamID() --we will move this to init later.
 local myCommanderTable = {}
 local commanderDefIDsList = {}
@@ -657,7 +663,7 @@ local posX,posZ = 512,512
 local fontsize = 20
 local healthToDraw
 local drawer = false --if true we draw, if false we don't
-local gl_CallList = gl.CallList
+
 for udid, ud in pairs(UnitDefs) do
 	if ud.customParams.iscommander then
 		table.insert(commanderDefIDsList, udid)
@@ -704,7 +710,7 @@ end
 
 function widget:DrawScreen()
     if drawer and healthToDraw then
-        gl_CallList(healthToDraw)
+        gl.CallList(healthToDraw)
     end
 end
 
@@ -714,21 +720,20 @@ end
 
 function widget:Update()
         PopulateCommanderHealthTable()
-    end
 end
 ```
 ## Cleaning Up
-Hopefully it worked, but a few big bugs will have stood out - I noticed the position on screen makes no sense, the hit points become floats not Ints, and commanders that die don't get removed from the list. If we look at the widget profiler XXX, we can also see it's using quite a few resources, perhaps we shouldn't be running the code every update tick.
+Hopefully it worked, but a few big bugs will have stood out - I noticed the position on screen makes no sense, the hit points become floats not Ints, and commanders that die don't get removed from the list. If we look at the widget profiler XXX, we can also see it's using quite a few resources, perhaps we shouldn't be running the code every update tick. May also be fun to change the colour of the text to Red <20%, and yellow for <50%.
 
 The tutorial ends here, but try fixing the issues yourself. There's a file with my bug fixes in the github XXX to compare.
 
 Some useful functions that may help are
 ```lua
-math.floor() and math.ceil()
-widget:UnitDestroyed()
-widget:ChangeTeam()
-Spring.GetViewGeometry()
-widget:PlayerChanged()
+math.floor() and math.ceil() --Round up or down to nearest int
+widget:UnitDestroyed() --When a unit is destroyed
+widget:UnitGiven() -- When a unit is transfered
+Spring.GetViewGeometry() --Game resolution in pixel
+widget:PlayerChanged() --When the player changes team.
 ```
 
 # Widget Specific Tips
@@ -749,6 +754,19 @@ Spectators take the teamID and allyTeamID of the player they selected (but not t
 
 Things get weird when making a widget work with players, spectators, ai, raptors, scavs and gaia! Double check what arguments your the functions need.
 
+## UnitDefs
+UnitDefs is a metatable containing all the unit type info. The way to access the deeper parts of it is using pairs(). xxx expand
+```lua
+--WIP
+for udid, ud in pairs(UnitDefs) do
+	for wdid, weaponDef in pairs(ud.weapons) do
+		if WeaponDefs[ud.weapons[wdid].weaponDef] the
+        local type = WeaponDefs[ud.weapons[wdid].weaponDef].type
+        break
+        end
+    end
+end
+```
 
 # End
 I hope this helped you get started into the world of widgets, and if you get a taste for it, contributing to BAR. We've barely scratched the surface of useful things, but I do hope you found this guided tutorial somewhat helpful. Please join the discord channels (take the dev role) and come chat, share ideas and ask questions, all the devs I've met there are friendly, encouraging and willing to help. BAR depends on contributions to continue to improve, and with limited human power, Every Little Helps (tm).
