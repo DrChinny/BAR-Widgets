@@ -1,34 +1,33 @@
 Beyond All Reason Getting Started with Widgets Guide, writen by Mr_Chinny.
 
-# About This Guide
 
-This guide is divided into several sections. Read from start to finish or skip to the relevent section:
-- [What are Widgets in Beyond All Reason:](#what-are-widgets-in-beyond-all-reason) For an overview of Widgets and thier uses and limits.
-- [Coding Environment:](#coding-environment) Getting set up with required software and lua.
-- [Creating Our Widget:](#creating-our-widget) Complete guided walkthrough of making simple widget.
-- [Widget Specific Tips:](#widget-specific-tips) Useful Tips to save headaches
-- [End:](#end) Closing remarks.
-
-<br>
-<br>
 
 # What are Widgets in Beyond All Reason?
-In Beyond all reason (BAR), widgets play a huge part in how the game looks, plays and feels. 
+In Beyond all reason (BAR), widgets play a huge part in how the game looks, plays and feels. These little bits of code enhance the user experience by showing us information, adding features, or changing game behaviour in benificals ways 
 This guide is aimed at anyone interested in making their own widget, but particularly those of us who may call themselves hobbyists, coming from non-computer science backgrounds, and knowing little to nothing about BAR coding.
 BAR is great, but as most discussion takes place through GitHub and discord, it can be hard to know where to start, and where the resources are (spoiler - they are all over the place).
 In this guide, we will walk through coding a simple widget and explain what and why we are doing each step, as well as going over common pitfalls that come with experience.
 A certain amount of experience with coding is assumed, check out the 'Super Brief lua guide' further down for what we will be doing. 
 
 
+# About This Guide
 
-## Quick Widget Introduction
+This guide is divided into several sections. Read from start to finish or skip to the relevent section:
+- [Quick Widget Introduction:](#quick-widget-introduction) For an overview of Widgets and thier uses and limits.
+- [Coding Environment:](#coding-environment) Getting set up with required software and lua.
+- [Creating Our Widget:](#creating-our-widget) Complete guided walkthrough of making simple widget.
+- [Widget Specific Tips:](#widget-specific-tips) Useful tips when coding to save headaches down the line.
+- [End:](#end) Closing remarks.
 
-Widgets files of lua code that run during a game of BAR. They can't affect the simulation directly but can issue commands to your own units. They are specialised to achieve a particular thing, and generally fall into the following categories:
+<br>
+<br>
+
+# Quick Widget Introduction
+
+Widgets are files of lua code that run during a game of BAR. They can't affect the simulation directly but can issue commands to your own units. They are specialised to achieve a particular thing, and generally fall into the following categories:
 - >`Display Some Info on the Screen` - This could be the topbar showing income, the player list of allies and enemies, range or radar circles, ghost outline of buildings at the start of the game, and many many more.
 - >`Change Behaviour of a Unit` - Constructors auto guarding a factory, fighters patrolling out of the airlab, etc
-- >`Extra Control Pptions and Features` - Bar's famous line drag control, grid building etc.
-
-
+- >`Extra Control Options and Features` - BAR's famous line drag control, grid building etc.
 
 ## Widgets and Gadgets
 Similar to **widgets**, there are also things called **gadgets**. 
@@ -129,6 +128,18 @@ Right, you have this great idea that will revolutionise the game (or maybe not),
 
 - > You want a copy of BAR dev branch from Github. There are separate guides that explain doing this [Bar Github Readme](https://github.com/beyond-all-reason/Beyond-All-Reason/blob/master/README.md) or in the discord. This is very useful for autosuggestions in vscode.
 
+## Enabling Widgets Within the Game
+There are two types of widget within the game; *default* widgets that are provided automatically when you play the game, and *custom* widgets you need to download yourself. Sometime, a custom widget will be popular and useful enough that the devs will decide it should be added to the base game. There's no change to the code when this happens, it's the same widget just added to the BAR GitHub.
+
+If you haven't downloaded a custom widget before, the process is simple. Hop over to discord channel [widgets](https://discord.com/channels/549281623154229250/1113845509891829810) and there are hundreds to choose from. To "install" the widget, you simply put the <widget_name.lua> it in your widget folder in the game directory eg `C:\Program Files\Beyond-All-Reason\data\LuaUI\Widgets`, creating the folder if it doesn't exist. We will put our example widget in this folder. In a game, you can turn the widget on and off in the settings menu, or using the widget selector, and I'm going to quote the discord bot in how to do this:
+
+`Nowadays, most custom widgets can be enabled in the in-game options, in the Custom tab. In the past, the recommended way of toggling custom widgets was opening the Widget Selector with the F11 hotkey, scrolling down past all the built-in widgets, and clicking the names of your custom downloaded widgets. Because it allowed users to inadvertently disable widgets they really need, like most of the UI, it was made opt-in - F11 is disabled until you do.`
+
+`If you still wish to enable the "retro" Widget Selector, opt into it by typing /widgetselector into all-chat in a match or replay.The widget selector may need to be enabled the first time you use it`
+
+You will see the list of widgets is long, and this is what makes BAR what it is! It's not recommended to turn on or off any non-custom widgets from this menu unless you know what you are doing, custom widgets will be at the bottom in their own section. One final thing of note here, at the top of the f11 list is the widget profiler, when enabled this is a useful debugging tool that displays the CPU and memory a widget is consuming in realtime. This is safe to turn On and Off as you like (but will obsure your screen when on!).
+
+By the COC, any widget you use in the game HAS to be provided on the discord widget chat. Obviously you will not get in trouble when building your own widget if you don't yet have it on there, but once completed you give it a post and upload it for others. Using a privite widget to gain an in game advantage is against COC.
 
 
 ## Super Brief lua guide
@@ -199,11 +210,11 @@ Copy the code below to the beginning of your code, changing the various strings 
 ```lua
 function widget:GetInfo()
     return {
-      name      = "Commander Health",
-      desc      = "Displays current health of commanders",
-      author    = "Your Name",
-      date      = "Aug 2024",
-      enabled   = true
+        name    = "Commander Health",
+        desc    = "Tutorial Commander Health",
+        author  = "Your_Name",
+        date    = "Aug 2024",
+        enabled = true
     }
 end
 ```
@@ -325,7 +336,7 @@ The above should work, but there’s a number of improvements we can make. One t
 
 To fix this, most of the time, we can lookup differences between "types" of units within the `UnitDefs`. In our case, we want something that tells us if a unit is a commander. Fortunately, there is just the thing: within customparams, `iscommander = true` is present for all commanders.
 This is more future proof, as anyone who adds a new commander unit to the game for a mod can (and should!) simply add this tag when creating it.
-To find this we need to cycle through the `UnitDefs` using `pairs()`. Note that the `UnitDefs` need to be cycled through in this way to access the deeper tables nested within it, direct access does not work.
+To find this we need to cycle through the `UnitDefs` using `pairs()`. Note that the `UnitDefs` need to be cycled through in this way to access the deeper tables nested within it, direct access does not work- [UnitDefs Metatable](#unitdefs)
 
 ```lua
 local commanderDefIDsList = {}
@@ -402,11 +413,11 @@ Please copy the code below into your blank file and save it.
 ```lua
 function widget:GetInfo()
     return {
-      name      = "Commander Health",
-      desc      = "Displays Commander Health",
-      author    = "Your Name",
-      date      = "Aug 2024",
-      enabled   = true
+        name    = "Commander Health",
+        desc    = "Tutorial Commander Health",
+        author  = "Your_Name",
+        date    = "Aug 2024",
+        enabled = true
     }
 end
 
@@ -646,11 +657,11 @@ If we put everything together and run it our function on Update(), We should get
 ```lua
 function widget:GetInfo()
     return {
-      name      = "Commander Health",
-      desc      = "Tutorial Commander Health",
-      author    = "Your_Name",
-      date      = "Aug 2024",
-      enabled   = true
+        name    = "Commander Health",
+        desc    = "Tutorial Commander Health",
+        author  = "Your_Name",
+        date    = "Aug 2024",
+        enabled = true
     }
 end
 
@@ -738,6 +749,8 @@ widget:PlayerChanged() --When the player changes team.
 
 # Widget Specific Tips
 ## About teamID, allyTeamID, playerID, GaiaID
+refer to [Team terminology](https://beyond-all-reason.github.io/spring/articles/team-terminology)
+
 One important thing that I want to address is the difference between the terms above, as they all have specific meaning, and are not interchangable. The person who originally named these was either drunk or a sadist.
 
 Using English: In an a 8v8 match, there are two teams (red and blue), each with 8 members (various warm and cold colours respectivly), and (assuming no AI), each with 8 players.
@@ -754,8 +767,11 @@ Spectators take the teamID and allyTeamID of the player they selected (but not t
 
 Things get weird when making a widget work with players, spectators, ai, raptors, scavs and gaia! Double check what arguments your the functions need.
 
+## Lua Optimisation
+
+
 ## UnitDefs
-UnitDefs is a metatable containing all the unit type info. The way to access the deeper parts of it is using pairs(). xxx expand
+UnitDefs is a metatable containing all the unit type info. Metatables The way to access the deeper parts of it is using pairs(). xxx expand
 ```lua
 --WIP
 for udid, ud in pairs(UnitDefs) do
@@ -767,6 +783,8 @@ for udid, ud in pairs(UnitDefs) do
     end
 end
 ```
+## Code of Conduct
+xxx here
 
 # End
 I hope this helped you get started into the world of widgets, and if you get a taste for it, contributing to BAR. We've barely scratched the surface of useful things, but I do hope you found this guided tutorial somewhat helpful. Please join the discord channels (take the dev role) and come chat, share ideas and ask questions, all the devs I've met there are friendly, encouraging and willing to help. BAR depends on contributions to continue to improve, and with limited human power, Every Little Helps (tm).
