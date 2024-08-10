@@ -378,14 +378,14 @@ end
 ```
 ### Spring.Echo()
 At this point we should check everything is working. This is where `Spring.Echo()` and the `infolog.txt` come in.
-Our biggest debugging tool is a highly helpful little chap called `Spring.Echo()`. Much like `print()` prints the output of code, `Spring.Echo()` will display, as a message in game,whatever is within the ().
-This meeage is also recorded in the `infolog.txt`, along many other things each game. A finished widget should have all `Spring.Echo()` removed so as to not fill the info log up with anything. `infolog.txt` can be found in the game directory, and can be opened by vscode.
+Our biggest debugging tool is a highly helpful little chap called `Spring.Echo()`. Much like `print()` prints the output of code, `Spring.Echo()` will display whatever is within the () as a message in-game.
+This message is also recorded in the `infolog.txt`, alongside many other things each game. A finished widget should have all `Spring.Echo()` removed so as to not fill the info log up with anything. `infolog.txt` can be found in the game directory, and can be opened by vscode.
 
-`Spring.Echo()` can display strings of the varible, multiple varlibles, and recently even the contents of tables! When using it, seperate the arguments with ",". eg `Spring.Echo("this is a counter ", counter, " that I made")`
-`Spring.Echo()` has some anti spam protection: it will not display the exact same message in a row multiple times, it will however display messages that are not identical, so two `Spring.Echo("a")` and `Spring.echo("b")`, put in something that runs once per update, would flood your infolog very quickly! Large nested tables can also take up thousands of lines, so be careful.
+`Spring.Echo()` can display strings of a varible, multiple varlibles, and recently even the contents of tables! When using it, seperate the arguments with ",". eg `Spring.Echo("this is a counter ", counter, " that I made")`.
+`Spring.Echo()` has some anti spam protection: it will not display the exact same message multiple times in a row, it will however display messages that are not identical, so two `Spring.Echo("a")` and `Spring.echo("b")`, put in something that runs once per update, would flood your infolog very quickly! Large nested tables can also take up thousands of lines, so be careful.
 
-To check our code is working, we need to print our lists and see if they contain our commander stats. I have snuck in the echos to the end of our function, so we will use a callin called `MousePress()` to activate the function once on a mouse press.
-`MousePress()` gives us mx and my screen coords of the mouse (we dont care about these today), and which `button` it pressed (1 = left click)
+To check that our code is working, we need to print our lists and see if they contain our commander stats. I have snuck in the echos to the end of our function, so we will use a callin called `MousePress()` to activate the function once on a mouse press.
+`MousePress()` gives us mx and my screen coords of the mouse (we don't care about these today), and which `button` it pressed (1 = left click)
 ```lua
 function widget:MousePress(_, _, button)
     if button == 1 then
