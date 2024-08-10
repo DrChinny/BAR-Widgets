@@ -70,7 +70,7 @@ We will need our widget to gather some data from within the game. I've divided t
 The engine keeps some accessible information about all sorts of stuff. There are many many many existing functions in spring engine that clever people have added in the past that give us a way of finding out about things in the game. In particular units and their stats, but also mouse coords, camera angles, team members and access to functions that other widgets provide. A few important ones are listed below:
 
 - >`UnitDefs` -`UnitDefs` is a big kind of table that contains everything you will need to know about a unit **type**, based on the specific game settings. From its name, cost, weapons, initial hp, animations, sounds, types, to custom parameters (where everything else should be stored). It is created outside the widget and is very useful. We will be using this later. `UnitDefs` is populated from the individual unit files, weapons files and animations.
-To explore it, we need a `unitDefID` (not to be confused with `unitID`). Every unit in the game has a unique `unitID`. Find this, translate it to its `unitDefID`, and put it this the `UnitDefs`, and assuming you do it in the right way you can access these variables.
+To explore it, we need a `unitDefID` (not to be confused with `unitID`). Every unit in the game has a unique `unitID`. Find this, translate it to its `unitDefID`, pull the corresponding entry in `UnitDefs`, and assuming you do it in the right way you can access these variables.
 
 To avoid confusion, If we made 10 ticks, all would have the same `unitDefID` number, but each would have a unique `unitID`. It is simple to find the `unitDefID` given the `unitID`
 
