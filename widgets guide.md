@@ -55,14 +55,14 @@ Some real examples:
 3) >`Get position your launched nuke`   ----> `Lookup impact radius range and create Graphics for impact radius` ----> `Display warning to teammates of your nuke. `
 4) >`Get position of a visable enemy`   ----> `Predict its position in 3 seconds based on current movement` ----> `Aim nearby friendly artillery to that spot. `
 
-The last idea in this list (which too my knowledge I just made up), would likely give the user a big and unfair advantage, therefore be against the code of conduct, and not allowed. Better to check if unsure, before spending time making it. see [COC](#widget-specific-tips) xxx for more
+The last idea in this list (which too my knowledge I just made up), would likely give the user a big and unfair advantage, therefore be against the code of conduct, and not allowed. Better to check if unsure, before spending time making it. See [COC](#widget-specific-tips) xxx for more.
 
 
-## What does a Widget has Access to?
+## What does a Widget have Access to?
 We will need our widget to gather some data from within the game. I've divided this into two major categories
 
-1) >`Read data from another files` -Look up information about something the game, such as unit position or hit points. In the widget enviroment this is limited generally to things that the player could see if they were playing.
-2) >`Use a call-in provided by the widget wrapper` -Get relevent information regarding an event that has just occurred in the game, such as when a unit created or destroyed.
+1) >`Read data from another file` -Look up information about something in the game, such as unit position or hit points. In the widget environment this is generally limited to things that the player could see if they were playing.
+2) >`Use a call-in provided by the widget wrapper` -Get relevent information regarding an event that has just occurred in the game, such as when a unit is created or destroyed.
 
 
 ### Read Data from other Files
