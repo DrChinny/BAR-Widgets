@@ -175,7 +175,7 @@ local function AreTickOP(bool)
     if bool == true then
         return "Yes, ticks are OP"
     else
-        return "Yes, ticks are OP"
+        return "No, ticks are balanced"
     end
 end
 local theTruth = AreTickOP(true)
