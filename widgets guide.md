@@ -52,7 +52,7 @@ Some real examples:
 1) >`Get your commander's hit points`   ----> `Check if hit points are reduced by a certain amount` ----> `Display a visual and audio warning that commander is low on hp.`
 2) >`Get mouse position when clicked`   ----> `If clicks made rectangle, find units that fall with in` -----> `Select all combat units (but not constructors and buildings) `
 3) >`Get position your launched nuke`   ----> `Lookup impact radius range and create Graphics for impact radius` ----> `Display warning to teammates of your nuke. `
-4) >`Get position of a visable enemy`   ----> `Predict its position in 3 seconds based on current movement` ----> `Aim nearby friendly artillery to that spot. `
+4) >`Get position of a visible enemy`   ----> `Predict its position in 3 seconds based on current movement` ----> `Aim nearby friendly artillery to that spot. `
 
 The last idea in this list (which too my knowledge I just made up), would likely give the user a big and unfair advantage, therefore be against the code of conduct, and not allowed. Better to check if unsure, before spending time making it. see [COC](#widget-specific-tips) xxx for more
 
