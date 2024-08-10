@@ -415,7 +415,7 @@ local myCommanderTable = {}
 local commanderDefIDsList = {}
 
 for udid, ud in pairs(UnitDefs) do
-	if ud.customParams.iscommander then
+	if ud.customparams.iscommander then
 		table.insert(commanderDefIDsList, udid)
 	end
 end
@@ -443,7 +443,7 @@ If we add all the code so far together as above, and load up a skirmish against 
 
 Mine looks like this, yours may differ. Turns out there are a fair number of units that identify as coms (the numbers in the first table, which are unitDefID). You can look up what they are by looping through UnitDefs if you like.
 
-The second table shows our starting com, unitID is 12052, current HP is 3700 and max is 3700. Cool. If this doesn't work then check the widget is enabled, and you have left clicked once after the game starts. Also, although the infolog updates in real time, sometimes it only updates if there's several things to write to it. In a skirmish you can pause/unpause a few times if the `Spring.Echo()` isn't showing at the bottom yet (in a multiplayer game I minimise and maximise the screen which also writes to the log). If it's still not working ask for help in discord!
+The second table shows our starting com, unitID is 12052, current HP is 3700 and max is 3700. Cool. If this doesn't work then check if the widget is enabled, and you have left clicked once after the game starts. Also, although the infolog updates in real time, sometimes it only updates if there's several things to write to it. In a skirmish you can pause/unpause a few times if the `Spring.Echo()` isn't showing at the bottom yet (in a multiplayer game I minimise and maximise the screen which also writes to the log). If it's still not working ask for help in discord!
 
 ```log
 [t=00:12:06.644854][f=0016907] Debugging1 commanderDefIDsList:, <table>
@@ -483,8 +483,8 @@ The second table shows our starting com, unitID is 12052, current HP is 3700 and
 
 We can now move onto the processing step where we need to take the hit points and do any manipulations or checks, then get ready to display them.
 
-BAR uses openGL to do it's drawing. If you don't know anything about openGL, it's a graphic API for vector graphics, and a pretty large topic, with many great guides online.
-Fortunately the devs have made many tools to help us here so we don't need to start from scratch, nor massively concern ourselves with how it works. We will make use of another widget that is shipped with the game which handles the backend stuff and allows us to use a simple commands to draw text.
+BAR uses openGL to do its drawing. If you don't know anything about openGL, it's a graphic API for vector graphics, and a pretty large topic, with many great guides online.
+Fortunately the devs have made many tools to help us here so we don't need to start from scratch, nor massively concern ourselves with how it works. We will make use of another widget that is shipped with the game which handles the backend stuff and allows us to use simple commands to draw text.
 
 Draw callins - that is those which let us draw stuff, are `DrawScreen()` for drawing on the screen (think the UI), or the world `DrawWorld()` for drawing to the map (think radar overlay). These are resource expensive, so we keep as much code away from them as possible, and try to only use them to send our graphics to be drawn. If we can also reduce changing the drawing as much as possible, we greatly reduce the load on the CPU.
 
@@ -559,7 +559,7 @@ We would need to scale all these values based on screen resolution and UIScale, 
 
 ### One More Conditional
 We also need to decide when to run the `CreateHealthInfoTexture()` function. There's no point in rewriting this every frame if nothing has changed with commander hit points, so we can check against this in the previous function we wrote.
-To do this we will check if the commander unit health (or max health due to promotions) from the last check is the same as now, and if it isn't flip an update variable. We also need to flip the update if there's we get a new commander. Finally, we need to remove dead commanders from the list, or they will always be displayed (but won't clutter the code below by adding this yet). You may also see there's a `drawer` and `counter` added. This will be used when we wish to display the code on screen.
+To do this we will check if the commander unit health (or max health due to promotions) from the last check is the same as now, and if it isn't flip an update variable. We also need to flip the update if we get a new commander. Finally, we need to remove dead commanders from the list, or they will always be displayed (but won't clutter the code below by adding this yet). You may also see there's a `drawer` and `counter` added. This will be used when we wish to display the code on screen.
 Altogether, our (nearly completed) code will look like this.
 
 ```lua
@@ -574,7 +574,7 @@ local healthToDraw
 local drawer = false --If true we draw, if false we don't
 
 for udid, ud in pairs(UnitDefs) do
-	if ud.customParams.iscommander then
+	if ud.customparams.iscommander then
 		table.insert(commanderDefIDsList, udid)
 	end
 end
@@ -665,7 +665,7 @@ local healthToDraw
 local drawer = false --if true we draw, if false we don't
 
 for udid, ud in pairs(UnitDefs) do
-	if ud.customParams.iscommander then
+	if ud.customparams.iscommander then
 		table.insert(commanderDefIDsList, udid)
 	end
 end
