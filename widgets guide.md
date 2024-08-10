@@ -276,7 +276,7 @@ function widget:Update()
 ```
 
 This callin is run every single update in the game. It's a bit overkill to run our 'Spring.GetUnitHealth (unitID)' every frame, but it will work. We could always use a counter so we only actually run our code every 10 updates, or every 100.
-A better callin may be one that occurs when a unit is damaged, but we also need to considering regeneration of health and repair, so we will stick with 'Update()' now.
+A better callin may be one that occurs when a unit is damaged, but we also need to consider regeneration of health and repair, so we will stick with 'Update()' now.
 
 We still need to find the 'unitID' of the commander; that is the unique ID that belongs to our commander. One way of doing this is cycling through all the units in the game, and checking if they are a commander type. However, we can reduce load considerably as we only need to cycle through units belonging to us, not enemies, and not teammates.
 
@@ -287,13 +287,13 @@ Spring.GetTeamUnits ( number teamID )
 return: nil | table unitTable = { [1] = number unitID, ... }
 ```
 
-This one looks hopeful, it returns a table containing all our units for a given `teamID`. `teamID` is often better thought as the ID of a member within of a larger them (see note below). But we need our only our `teamID`, and then we will need to cycle through the table of `unitIDs` it returns to find any unit that is a commander. For this we will turn the `unitID` into the `unitDefID`, then check against the `UnitDefs` table to find if it is a commander - but we are getting ahead of ourselves.
+This one looks hopeful, it returns a table containing all our units for a given `teamID`. `teamID` is often better thought as the ID of a member within of a larger them (see note below). But we need only our `teamID`, and then we will need to cycle through the table of `unitIDs` it returns to find any unit that is a commander. For this we will turn the `unitID` into the `unitDefID`, then check against the `UnitDefs` table to find if it is a commander - but we are getting ahead of ourselves.
 - There's an important bit of the tutorial later focusing on the difference between `teamID`, `playerID`, `allyTeamID` and AIs. XXX in tutorial. 
 
 ```lua
 myTeamID = Spring.GetMyTeamID()
 ```
-This useful chap returns our (that is the person running the widget) teamID, which we will store in a variable 'myTeamID
+This useful chap returns our (that is the person running the widget) teamID, which we will store in a variable 'myTeamID'.
 Under nearly all circumstances, if playing, our teamID will not change. This isn't true for spectators, so if we wish the widget to work for spectators too, then we need to be a bit more careful. To not overcomplicate  things, we will address this later on. As grabbing the `teamID` doesn't cost much in CPU resources, we will grab it every update too.
 
 Putting this all together, and adding in the looping code we may end up with something like this: (Note running this code will not produce an visable output in this example)
@@ -330,7 +330,7 @@ To find this we need to cycle through the `UnitDefs` using `pairs()`. Note that 
 ```lua
 local commanderDefIDsList = {}
 for udid, ud in pairs(UnitDefs) do --populate table with all units that are commanders
-	if ud.customParams.iscommander then
+	if ud.customparams.iscommander then
 		table.insert(commanderDefIDsList, udid)
 	end
 end
