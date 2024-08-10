@@ -26,7 +26,7 @@ A certain amount of experience with coding is assumed, check out the 'Super Brie
 Widgets files of lua code that run during a game of BAR. They can't affect the simulation directly but can issue commands to your own units. They are specialised to achieve a particular thing, and generally fall into the following categories:
 - >`Display Some Info on the Screen` - This could be the topbar showing income, the player list of allies and enemies, range or radar circles, ghost outline of buildings at the start of the game, and many many more.
 - >`Change Behaviour of a Unit` - Constructors auto guarding a factory, fighters patrolling out of the airlab, etc
-- >`Extra Control Pptions and Features` - Bar's famous line drag control, grid building etc.
+- >`Extra Control Options and Features` - Bar's famous line drag control, grid building etc.
 
 
 
