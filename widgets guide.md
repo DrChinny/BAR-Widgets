@@ -348,7 +348,7 @@ return: nil | table unitTable = { [1] = number unitID, ... }
 This function tells us if we provide the `teamID` and (`unitDefID` OR a `table of unitDefIDs`), we get back a table of `unitID`s.
 this is ideal for us, since if we provide it with the conveniently made table: `commanderDefIDsList`, we will get only the `unitID` of commander type. 
 The returned table will also be an array type, meaning we can check its size with the the length operator `#`. Thinking ahead, if nothing is returned, it means we have no commanders, if one commander is found, the table will have a length of 1, if two commanders are found, the length will be 2, and so on. This allows us an early exit should 0 commanders be found, as we don't need to continue wasting resources running the code.
-Finally, rather than have all this code written in the callin `update()`, we are going to give it its own function, giving more control to when and where we run it, even if we still end up running it on `Update()` when we are done.
+Finally, rather than have all this code written in the callin `Update()`, we are going to give it its own function, giving more control to when and where we run it, even if we still end up running it on `Update()` when we are done.
 
 
 Putting that all together, our new code looks like this:
@@ -360,7 +360,7 @@ local myCommanderTable = {}
 local commanderDefIDsList = {}
 
 for udid, ud in pairs(UnitDefs) do --populate table with all units that are commanders
-	if ud.customParams.iscommander then
+	if ud.customparams.iscommander then
 		table.insert(commanderDefIDsList, udid)
 	end
 end
