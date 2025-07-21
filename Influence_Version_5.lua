@@ -38,6 +38,7 @@ local newUnitListMobile = {}
 local deadUnitListAll = {}
 local existingUnitListMobile = {}
 local transferedUnitListAll = {}
+local transportedUnitListStatic = {}
 local teamAllyTeamIDs = {} --cache of teams key=teamids, data=allyteamids
 local teamColourCache = {} --cache of team colours, key = teamid, data = {r,g,b}
 local allyTeamColourCache = {} --cache of allyteamid colours (ie the captin of each allyteam's colour)
@@ -857,11 +858,8 @@ local function ProcessUnitAddOrRemove(unitID,udID,teamID,allyTeamID,posX,posZ,de
         local gridCoordZ = floor(posZ/ gridResolution)
         local squares = TranslateSquares(quickRefList[udID].translatablesquares,gridCoordX,gridCoordZ)
         local mobile = quickRefList[udID].mobile
-        storedUnitInfoList[unitID] = {udID = udID, teamID = teamID, allyTeamID = allyTeamID, dps = dps, squares = squares, mobile = mobile, gridCoordX = gridCoordX, gridCoordZ = gridCoordZ, posX = posX, posZ = posZ }
+        storedUnitInfoList[unitID] = {udID = udID, teamID = teamID, allyTeamID = allyTeamID, dps = dps, squares = squares, mobile = mobile, gridCoordX = gridCoordX, gridCoordZ = gridCoordZ, posX = posX, posZ = posZ, transporting = false }
     else
-    end
-    if unitID == 23089 then
-        Spring.Echo("storedUnitInfoList[unitID] 23089",storedUnitInfoList[unitID])
     end
     for i,coordData in pairs(storedUnitInfoList[unitID].squares) do
         
@@ -885,9 +883,7 @@ local function ProcessUnitAddOrRemove(unitID,udID,teamID,allyTeamID,posX,posZ,de
 end
 
 local function ProcessUnitChangePositionNew(unitID,posX,posZ)
-    -- if unitID == 23089 then
-    --     Spring.Echo("23089 in changed position:",unitID,posX,posZ,storedUnitInfoList[unitID])
-    -- end
+
     local unitData = storedUnitInfoList[unitID]
     if unitData then
         local gridCoordX = floor(posX/ gridResolution) --First check it has moved into a new Grid X or Grid Z, exit if it hasn't actually moved grid
@@ -906,15 +902,9 @@ local function ProcessUnitChangePositionNew(unitID,posX,posZ)
         --local oldSquares = unitData.squares
         local newSquares = TranslateSquares(quickRefList[unitData.udID].translatablesquares,gridCoordX,gridCoordZ)--xxx compare lists, reduce the amount of influence calls
         local changedSquares = TableDifferences(newSquares,unitData.squares)
-        -- if unitID == 23089 then
-        --     Spring.Echo("23089 in changedsquare:",changedSquares)
-        --     Spring.Echo("23089 in new square:",newSquares)
-        -- end
         for coordData,bool in pairs(changedSquares) do
             if coordData[1] < 0 or coordData[1] >= numberOfSquaresInX or coordData[2] < 0 or coordData[2] >= numberOfSquaresInZ then --ignore if out of bounds
-                --Spring.Echo("out of bounds",coordData[1],coordData[2])
             else
-                --local coord = gridXYtoCoordCache[coordData[1]][coordData[2]]
                 local coord = GridXYtoCoord(coordData[1],coordData[2])
                 notMoveCounter = notMoveCounter + 1
                 
@@ -1005,11 +995,27 @@ local function ExtractFrame(frame) --Each new unit is processed (added inf). Eac
         end
     end
 
+    extractList = transportedUnitListStatic[frame] --[udid,loaded,posX,posZ]
+        for unitID, data in pairs(extractList) do
+            if data[2] then
+                --transportTracking[unitID] = true
+
+                --zzz need to make a function to remove the influecne.
+                --remove original influence spot
+                --add to tracking list
+            else
+                --transportTracking[unitID] = false
+                ProcessUnitChangePositionNew(unitID,data[3],data[4])
+                --add new influence at position
+                --remove from tracking list
+            end
+        end
+
     extractList = transferedUnitListAll[frame]
     for unitID, data in pairs(extractList) do
             if storedUnitInfoList[unitID] then
-                local newTeamID =  data[1]
-                local oldTeamID = data[2]
+                local newTeamID =  data[2]
+                local oldTeamID = data[1]
                 ProcessUnitTeamTransfer(unitID,oldTeamID,newTeamID)
             else --unit removed on deadlist
                 --Spring.Echo("Error 012: Stored unitList for transfered unit does not exist:",frame,unitID, deadUnitListAll[frame] )
@@ -1063,12 +1069,13 @@ local function ExtractFrame(frame) --Each new unit is processed (added inf). Eac
     StoreReplayListNew(frame)
 end
 
-local function Influence(masterNewUnitListStatic,masterNewUnitListMobile,masterDeadUnitListAll,masterExistingUnitListMobile,masterTransferedUnitListAll)
+local function Influence(masterNewUnitListStatic,masterNewUnitListMobile,masterDeadUnitListAll,masterExistingUnitListMobile,masterTransferedUnitListAll,masterTransportedUnitListStatic)
     newUnitListStatic = masterNewUnitListStatic
     newUnitListMobile = masterNewUnitListMobile
     deadUnitListAll = masterDeadUnitListAll
     existingUnitListMobile = masterExistingUnitListMobile
     transferedUnitListAll = masterTransferedUnitListAll
+    transportedUnitListStatic = masterTransportedUnitListStatic
     if newUnitListMobile[1] then
         Spring.Echo("WG log Success,")
     else
