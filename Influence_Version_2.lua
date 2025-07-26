@@ -9,6 +9,8 @@ function widget:GetInfo()
       layer = 0
     }
 end
+
+
 local spamChecker = 0 -- counter to stop spamming echos 
 -- if spamChecker < 10 then
 --     Spring.Echo()
@@ -98,6 +100,13 @@ local totalNumberofChunkX = ceil(numberOfSquaresInX / chunkDimension)
 local totalNumberofChunkZ = ceil(numberOfSquaresInZ / chunkDimension)
 local vsx, vsy                  = Spring.GetViewGeometry()
 local numberOfTeams = Spring.Utilities.GetAllyTeamCount()
+if Spring.Utilities.GetScavTeamID() then
+    numberOfTeams =numberOfTeams+1
+end
+if Spring.Utilities.GetRaptorTeamID() then
+    numberOfTeams =numberOfTeams+1
+end
+
 local gaiaTeamId                = Spring.GetGaiaTeamID()
 local gaiaAllyTeamID = select(6, Spring.GetTeamInfo(gaiaTeamId, false))
 local defaultdamagetag = Game.armorTypes['default'] --position that default is in on the weapon lists (0)
@@ -659,7 +668,7 @@ local function GetUnitStrength(unitID,teamID) --Produces the range, dps, and squ
                             end
                             local temp_dps = min(floor(damage / (reload or 1)),2000)--limit dgun power
                             if weaponDef.range > range and weaponDef.type ~= "StarburstLauncher" then --only update to biggest dps/range. may cause some funny behvaior for some units.
-                                range = weaponDef.range
+                                range = min(weaponDef.range,2000)
                             end
                             if temp_dps > dps then
                                 dps = temp_dps
@@ -923,9 +932,9 @@ end
 function widget:Initialize()
     UiUnit = WG.FlowUI.Draw.Unit
     --UiElement = WG.FlowUI.Draw.Element
-    Spring.Echo("mapSizeX",mapSizeX,"mapSizeZ",mapSizeZ,"numberOfSquaresInX",numberOfSquaresInX,"numberOfSquaresInZ",numberOfSquaresInZ,"totalNumberofChunkX",totalNumberofChunkX,"totalNumberofChunkZ",totalNumberofChunkZ,"chunkUpdateList",#chunkUpdateList)
+    --Spring.Echo("mapSizeX",mapSizeX,"mapSizeZ",mapSizeZ,"numberOfSquaresInX",numberOfSquaresInX,"numberOfSquaresInZ",numberOfSquaresInZ,"totalNumberofChunkX",totalNumberofChunkX,"totalNumberofChunkZ",totalNumberofChunkZ,"chunkUpdateList",#chunkUpdateList)
     fullview = select(2, Spring.GetSpectatingState())
-    Spring.Echo("spectator, fullview",spectator,fullview)
+    --Spring.Echo("spectator, fullview",spectator,fullview)
     ----Reset all lists------used for debuging
     drawInfluenceChunk = {}
     chunkUpdateList = {}
