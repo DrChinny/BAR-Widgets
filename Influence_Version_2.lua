@@ -165,11 +165,11 @@ for unitDefID, unitDef in pairs(UnitDefs) do
     end
     if unitDef.customParams.iscommander then -- this should find all extractors
         interestingDeathsTypes[unitDefID]   = true
-        iconTypes[unitDef.name] = orgIconTypes['armcom'].bitmap
+        iconTypes[unitDef.name] = orgIconTypes[unitDef.iconType].bitmap--orgIconTypes['armcom'].bitmap
     end
     if unitDef.name =='armafus' or unitDef.name =='corafus' or unitDef.name =='legafus' or unitDef.isFactory == true then --can i not hardcode the afus? xxx
         interestingDeathsTypes[unitDefID]   = true
-        iconTypes[unitDef.name]             = orgIconTypes[unitDef.name].bitmap
+        iconTypes[unitDef.name]             = orgIconTypes[unitDef.iconType].bitmap-- orgIconTypes[unitDef.name].bitmap 
     end
 
 end
