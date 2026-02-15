@@ -33,7 +33,8 @@ local spectator, fullview
 local firstsWinnersList = {}
 local firstsCategoryList = {["T2Army"] = false, ["T3Army"] = false, ["T2Factory"]=false, ["T2Constructor"] = false}
 local trackedFunStats = {}
-
+local milestoneTimes = {}
+local unfinishedSharedUnits = {}
 
 local function CacheTeams() -- get all the teamID / Ally Team ID captains and colours once, and cache.
     for _, allyTeamID in ipairs(Spring.GetAllyTeamList()) do
@@ -45,8 +46,10 @@ local function CacheTeams() -- get all the teamID / Ally Team ID captains and co
             else
                 gaiaID = teamID
             end
-
         end
+    end
+    for name, _ in pairs(firstsCategoryList) do
+        milestoneTimes[name] = {}
     end
     
 end
@@ -76,21 +79,46 @@ local function AddValuesToMasterStatsTable (key)
 end
 
 local function StatTracking(teamID, unitDefID, value)
-    if teamID == gaiaTeamId then
+    if teamID == gaiaID then
         return
     end
     local tempCategory = {}
-    for caterogy, bool in pairs (firstsCategoryList) do
-        if not bool then
-           if unitDefsToTrack[caterogy][unitDefID] == true then
-                firstsWinnersList[caterogy] = {teamID, Spring.GetGameFrame()}
-                tempCategory[caterogy] = true
-           end
-        end
+    for category, bool in pairs (firstsCategoryList) do
+        if unitDefsToTrack[category][unitDefID] then
+            if not milestoneTimes[category][teamID] then
+                local time = math.floor(Spring.GetGameFrame()/30)
+                local min =  math.floor(time / 60)
+                local sec =  math.floor(time % 60)
+                local timeText = string.format("%d:%02d",min,sec).."s"
+                milestoneTimes[category][teamID] = {timeText,time,false,0} --xxx this bool needs to flag if a unit was shared.
+                if bool == false then
+                    local time = math.floor(Spring.GetGameFrame()/30)
+                    local min =  math.floor(time / 60)
+                    local sec =  math.floor(time % 60)
+                    local timeText = string.format("%d:%02d",min,sec).."s"
+                    firstsWinnersList[category] = {teamID, timeText, unitDefsToTrack[category][unitDefID][2],time}
+                    Spring.Echo("winner", category,bool, firstsWinnersList[category])
+                    tempCategory[category] = true
+                end
+            end
+
+                --Spring.Echo("unitDefsToTrack[category]",unitDefsToTrack[category][string(unitDefID)]) xxx fixing something here
+            --    if bool == false then
+            --         local time = math.floor(Spring.GetGameFrame()/30)
+            --         local min =  math.floor(time / 60)
+            --         local sec =  math.floor(time % 60)
+            --         local timeText = string.format("%d:%02d",min,sec).."s"
+            --         firstsWinnersList[category] = {teamID, timeText, unitDefsToTrack[category][unitDefID][2],time}
+            --         Spring.Echo("winner", category,bool, firstsWinnersList[category])
+            --         tempCategory[category] = true
+            --    end
+            end
+
     end
 
-    for caterogy, bool in pairs (tempCategory) do
-        firstsCategoryList[caterogy] = true
+    for category, bool in pairs (tempCategory) do
+        Spring.Echo("tempCategory", category,bool)
+        firstsCategoryList[category] = true
     end
 
     if not trackedFunStats[teamID][unitDefID] then
@@ -207,23 +235,23 @@ local function buildUnitDefs()
             unitDefsToTrack.economyBuildingDefs[unitDefID] = { math.floor(unitDef.metalCost + (unitDef.energyCost / 70)), unitDef.metalCost, unitDef.energyCost, unitDef.name, unitDef.translatedHumanName }
         end
         if isT2Army(unitDefID, unitDef) then
-            unitDefsToTrack.T2Army[unitDefID] = unitDef.translatedHumanName
+            unitDefsToTrack.T2Army[unitDefID] = {true, unitDef.translatedHumanName }
         end
 
         if isT3Army(unitDefID, unitDef) then
-            unitDefsToTrack.T3Army[unitDefID] = unitDef.translatedHumanName
+            unitDefsToTrack.T3Army[unitDefID] = {true, unitDef.translatedHumanName }
         end
         if isT2Factory(unitDefID, unitDef) then
-            unitDefsToTrack.T2Factory[unitDefID] = unitDef.translatedHumanName
+            unitDefsToTrack.T2Factory[unitDefID] = {true, unitDef.translatedHumanName }
         end
         if isT2Constructor(unitDefID, unitDef) then
-            unitDefsToTrack.T2Constructor[unitDefID] = unitDef.translatedHumanName
+            unitDefsToTrack.T2Constructor[unitDefID] = {true, unitDef.translatedHumanName }
         end
         if isWind(unitDefID, unitDef) then
-            unitDefsToTrack.wind[unitDefID] = unitDef.translatedHumanName
+            unitDefsToTrack.wind[unitDefID] = {true, unitDef.translatedHumanName }
         end
         if isLLT(unitDefID, unitDef) then
-            unitDefsToTrack.llt[unitDefID] = unitDef.translatedHumanName
+            unitDefsToTrack.llt[unitDefID] = {true, unitDef.translatedHumanName }
         end
 
 
@@ -270,7 +298,9 @@ local function AddStatToTemporaryStatTable(teamID,category,value)
 end
 
 local function RunSnapshotUpdate()
-    WG['saghelper'] = MasterStatTable
+    WG['saghelper'].masterStatTable = MasterStatTable
+    WG['saghelper'].trackedFunStats = trackedFunStats
+    WG['saghelper'].firstsWinnersList = firstsWinnersList
 end
 
 function widget:UnitFinished(unitID, unitDefID, teamID)
@@ -278,7 +308,7 @@ function widget:UnitFinished(unitID, unitDefID, teamID)
     --Spring.Echo("unit finished", teamID,category,value)
     if category then
         AddStatToTemporaryStatTable(teamID,category,value)
-        StatTracking()
+        StatTracking(teamID,unitDefID,value)
     else
         Spring.Echo("Debug - this unit isn't in any caterogies:", unitID, unitDefID, teamID )
     end
@@ -298,6 +328,7 @@ end
 
 function widget:UnitGiven(unitID, unitDefID, newTeam, oldTeam)
     if Spring.GetUnitIsBeingBuilt(unitID) then
+        unfinishedSharedUnits[unitID] = {newTeam,oldTeam}
         return
     end
     local category, value = DetermineCategoryAndValue(unitDefID)
@@ -318,7 +349,7 @@ local function Catchup()
             local category, value = DetermineCategoryAndValue(unitDefID)
             if teamID ~= Spring.GetGaiaTeamID and category then
                 AddStatToTemporaryStatTable(teamID,category,value)
-                StatTracking()
+                StatTracking(teamID,unitDefID,value)
             else
                 Spring.Echo("gaia or nil",teamID,unitID, UnitDefs[unitDefID].translatedHumanName, UnitDefs[unitDefID].name)
             end
@@ -342,14 +373,15 @@ end
 function widget:TextCommand(command)
     if string.find(command, "bag",nil,true) then
         Spring.Echo("bag ran")
-        Spring.Echo("trackedFunStats",trackedFunStats)
+        Spring.Echo("milestoneTimes",milestoneTimes)
+        Spring.Echo("unfinishedSharedUnits",unfinishedSharedUnits) -- zzz got to here, need to use the shared unit list to flag who made a key unit.
 
     end
 end
 
 function widget:GameFrame(n)
-    if (n + 1) % 450 ==0 then --xxx this will skip the first frame to allow 
-        snapShotNumber = ((n+1) /450)+1
+    if (n - 1) % 450 ==0 then --xxx this will skip the first frame to allow 
+        snapShotNumber = ((n-1) /450)+1
         AddValuesToMasterStatsTable(snapShotNumber)
         ClearTemporyStatTable()
         RunSnapshotUpdate()
