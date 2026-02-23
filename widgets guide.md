@@ -54,14 +54,14 @@ Some real examples:
 3) >`Get position your launched nuke`   ----> `Lookup impact radius range and create Graphics for impact radius` ----> `Display warning to teammates of your nuke. `
 4) >`Get position of a visible enemy`   ----> `Predict its position in 3 seconds based on current movement` ----> `Aim nearby friendly artillery to that spot. `
 
-The last idea in this list (which too my knowledge I just made up), would likely give the user a big and unfair advantage, therefore be against the code of conduct, and not allowed. Better to check if unsure, before spending time making it. see [COC](#widget-specific-tips) xxx for more
+The last idea in this list (which too my knowledge I just made up), would likely give the user a big and unfair advantage, therefore be against the code of conduct, and not allowed. Better to check if unsure, before spending time making it. See [COC](#widget-specific-tips) xxx for more.
 
 
-## What does a Widget has Access to?
+## What does a Widget have Access to?
 We will need our widget to gather some data from within the game. I've divided this into two major categories
 
-1) >`Read data from another files` -Look up information about something the game, such as unit position or hit points. In the widget enviroment this is limited generally to things that the player could see if they were playing.
-2) >`Use a call-in provided by the widget wrapper` -Get relevent information regarding an event that has just occurred in the game, such as when a unit created or destroyed.
+1) >`Read data from another file` -Look up information about something in the game, such as unit position or hit points. In the widget environment this is generally limited to things that the player could see if they were playing.
+2) >`Use a call-in provided by the widget wrapper` -Get relevent information regarding an event that has just occurred in the game, such as when a unit is created or destroyed.
 
 
 ### Read Data from other Files
@@ -69,7 +69,7 @@ We will need our widget to gather some data from within the game. I've divided t
 The engine keeps some accessible information about all sorts of stuff. There are many many many existing functions in spring engine that clever people have added in the past that give us a way of finding out about things in the game. In particular units and their stats, but also mouse coords, camera angles, team members and access to functions that other widgets provide. A few important ones are listed below:
 
 - >`UnitDefs` -`UnitDefs` is a big kind of table that contains everything you will need to know about a unit **type**, based on the specific game settings. From its name, cost, weapons, initial hp, animations, sounds, types, to custom parameters (where everything else should be stored). It is created outside the widget and is very useful. We will be using this later. `UnitDefs` is populated from the individual unit files, weapons files and animations.
-To explore it, we need a `unitDefID` (not to be confused with `unitID`). Every unit in the game has a unique `unitID`. Find this, translate it to its `unitDefID`, and put it this the `UnitDefs`, and assuming you do it in the right way you can access these variables.
+To explore it, we need a `unitDefID` (not to be confused with `unitID`). Every unit in the game has a unique `unitID`. Find this, translate it to its `unitDefID`, pull the corresponding entry in `UnitDefs`, and assuming you do it in the right way you can access these variables.
 
 To avoid confusion, If we made 10 ticks, all would have the same `unitDefID` number, but each would have a unique `unitID`. It is simple to find the `unitDefID` given the `unitID`
 
@@ -186,7 +186,7 @@ local function AreTickOP(bool)
     if bool == true then
         return "Yes, ticks are OP"
     else
-        return "Yes, ticks are OP"
+        return "No, ticks are balanced"
     end
 end
 local theTruth = AreTickOP(true)
@@ -287,7 +287,7 @@ function widget:Update()
 ```
 
 This callin is run every single update in the game. It's a bit overkill to run our 'Spring.GetUnitHealth (unitID)' every frame, but it will work. We could always use a counter so we only actually run our code every 10 updates, or every 100.
-A better callin may be one that occurs when a unit is damaged, but we also need to considering regeneration of health and repair, so we will stick with 'Update()' now.
+A better callin may be one that occurs when a unit is damaged, but we also need to consider regeneration of health and repair, so we will stick with 'Update()' now.
 
 We still need to find the 'unitID' of the commander; that is the unique ID that belongs to our commander. One way of doing this is cycling through all the units in the game, and checking if they are a commander type. However, we can reduce load considerably as we only need to cycle through units belonging to us, not enemies, and not teammates.
 
@@ -298,13 +298,13 @@ Spring.GetTeamUnits ( number teamID )
 return: nil | table unitTable = { [1] = number unitID, ... }
 ```
 
-This one looks hopeful, it returns a table containing all our units for a given `teamID`. `teamID` is often better thought as the ID of a member within of a larger them (see note below). But we need our only our `teamID`, and then we will need to cycle through the table of `unitIDs` it returns to find any unit that is a commander. For this we will turn the `unitID` into the `unitDefID`, then check against the `UnitDefs` table to find if it is a commander - but we are getting ahead of ourselves.
+This one looks hopeful, it returns a table containing all our units for a given `teamID`. `teamID` is often better thought as the ID of a member within of a larger them (see note below). But we need only our `teamID`, and then we will need to cycle through the table of `unitIDs` it returns to find any unit that is a commander. For this we will turn the `unitID` into the `unitDefID`, then check against the `UnitDefs` table to find if it is a commander - but we are getting ahead of ourselves.
 - There's an important bit of the tutorial later focusing on the difference between `teamID`, `playerID`, `allyTeamID` and AIs. XXX in tutorial. 
 
 ```lua
 myTeamID = Spring.GetMyTeamID()
 ```
-This useful chap returns our (that is the person running the widget) teamID, which we will store in a variable 'myTeamID
+This useful chap returns our (that is the person running the widget) teamID, which we will store in a variable 'myTeamID'.
 Under nearly all circumstances, if playing, our teamID will not change. This isn't true for spectators, so if we wish the widget to work for spectators too, then we need to be a bit more careful. To not overcomplicate  things, we will address this later on. As grabbing the `teamID` doesn't cost much in CPU resources, we will grab it every update too.
 
 Putting this all together, and adding in the looping code we may end up with something like this: (Note running this code will not produce an visable output in this example)
@@ -341,7 +341,7 @@ To find this we need to cycle through the `UnitDefs` using `pairs()`. Note that 
 ```lua
 local commanderDefIDsList = {}
 for udid, ud in pairs(UnitDefs) do --populate table with all units that are commanders
-	if ud.customParams.iscommander then
+	if ud.customparams.iscommander then
 		table.insert(commanderDefIDsList, udid)
 	end
 end
@@ -359,7 +359,7 @@ return: nil | table unitTable = { [1] = number unitID, ... }
 This function tells us if we provide the `teamID` and (`unitDefID` OR a `table of unitDefIDs`), we get back a table of `unitID`s.
 this is ideal for us, since if we provide it with the conveniently made table: `commanderDefIDsList`, we will get only the `unitID` of commander type. 
 The returned table will also be an array type, meaning we can check its size with the the length operator `#`. Thinking ahead, if nothing is returned, it means we have no commanders, if one commander is found, the table will have a length of 1, if two commanders are found, the length will be 2, and so on. This allows us an early exit should 0 commanders be found, as we don't need to continue wasting resources running the code.
-Finally, rather than have all this code written in the callin `update()`, we are going to give it its own function, giving more control to when and where we run it, even if we still end up running it on `Update()` when we are done.
+Finally, rather than have all this code written in the callin `Update()`, we are going to give it its own function, giving more control to when and where we run it, even if we still end up running it on `Update()` when we are done.
 
 
 Putting that all together, our new code looks like this:
@@ -371,7 +371,7 @@ local myCommanderTable = {}
 local commanderDefIDsList = {}
 
 for udid, ud in pairs(UnitDefs) do --populate table with all units that are commanders
-	if ud.customParams.iscommander then
+	if ud.customparams.iscommander then
 		table.insert(commanderDefIDsList, udid)
 	end
 end
@@ -389,14 +389,14 @@ end
 ```
 ### Spring.Echo()
 At this point we should check everything is working. This is where `Spring.Echo()` and the `infolog.txt` come in.
-Our biggest debugging tool is a highly helpful little chap called `Spring.Echo()`. Much like `print()` prints the output of code, `Spring.Echo()` will display, as a message in game,whatever is within the ().
-This meeage is also recorded in the `infolog.txt`, along many other things each game. A finished widget should have all `Spring.Echo()` removed so as to not fill the info log up with anything. `infolog.txt` can be found in the game directory, and can be opened by vscode.
+Our biggest debugging tool is a highly helpful little chap called `Spring.Echo()`. Much like `print()` prints the output of code, `Spring.Echo()` will display whatever is within the () as a message in-game.
+This message is also recorded in the `infolog.txt`, alongside many other things each game. A finished widget should have all `Spring.Echo()` removed so as to not fill the info log up with anything. `infolog.txt` can be found in the game directory, and can be opened by vscode.
 
-`Spring.Echo()` can display strings of the varible, multiple varlibles, and recently even the contents of tables! When using it, seperate the arguments with ",". eg `Spring.Echo("this is a counter ", counter, " that I made")`
-`Spring.Echo()` has some anti spam protection: it will not display the exact same message in a row multiple times, it will however display messages that are not identical, so two `Spring.Echo("a")` and `Spring.echo("b")`, put in something that runs once per update, would flood your infolog very quickly! Large nested tables can also take up thousands of lines, so be careful.
+`Spring.Echo()` can display strings of a varible, multiple varlibles, and recently even the contents of tables! When using it, seperate the arguments with ",". eg `Spring.Echo("this is a counter ", counter, " that I made")`.
+`Spring.Echo()` has some anti spam protection: it will not display the exact same message multiple times in a row, it will however display messages that are not identical, so two `Spring.Echo("a")` and `Spring.echo("b")`, put in something that runs once per update, would flood your infolog very quickly! Large nested tables can also take up thousands of lines, so be careful.
 
-To check our code is working, we need to print our lists and see if they contain our commander stats. I have snuck in the echos to the end of our function, so we will use a callin called `MousePress()` to activate the function once on a mouse press.
-`MousePress()` gives us mx and my screen coords of the mouse (we dont care about these today), and which `button` it pressed (1 = left click)
+To check that our code is working, we need to print our lists and see if they contain our commander stats. I have snuck in the echos to the end of our function, so we will use a callin called `MousePress()` to activate the function once on a mouse press.
+`MousePress()` gives us mx and my screen coords of the mouse (we don't care about these today), and which `button` it pressed (1 = left click)
 ```lua
 function widget:MousePress(_, _, button)
     if button == 1 then
@@ -426,7 +426,7 @@ local myCommanderTable = {}
 local commanderDefIDsList = {}
 
 for udid, ud in pairs(UnitDefs) do
-	if ud.customParams.iscommander then
+	if ud.customparams.iscommander then
 		table.insert(commanderDefIDsList, udid)
 	end
 end
@@ -454,7 +454,7 @@ If we add all the code so far together as above, and load up a skirmish against 
 
 Mine looks like this, yours may differ. Turns out there are a fair number of units that identify as coms (the numbers in the first table, which are unitDefID). You can look up what they are by looping through UnitDefs if you like.
 
-The second table shows our starting com, unitID is 12052, current HP is 3700 and max is 3700. Cool. If this doesn't work then check the widget is enabled, and you have left clicked once after the game starts. Also, although the infolog updates in real time, sometimes it only updates if there's several things to write to it. In a skirmish you can pause/unpause a few times if the `Spring.Echo()` isn't showing at the bottom yet (in a multiplayer game I minimise and maximise the screen which also writes to the log). If it's still not working ask for help in discord!
+The second table shows our starting com, unitID is 12052, current HP is 3700 and max is 3700. Cool. If this doesn't work then check if the widget is enabled, and you have left clicked once after the game starts. Also, although the infolog updates in real time, sometimes it only updates if there's several things to write to it. In a skirmish you can pause/unpause a few times if the `Spring.Echo()` isn't showing at the bottom yet (in a multiplayer game I minimise and maximise the screen which also writes to the log). If it's still not working ask for help in discord!
 
 ```log
 [t=00:12:06.644854][f=0016907] Debugging1 commanderDefIDsList:, <table>
@@ -494,8 +494,8 @@ The second table shows our starting com, unitID is 12052, current HP is 3700 and
 
 We can now move onto the processing step where we need to take the hit points and do any manipulations or checks, then get ready to display them.
 
-BAR uses openGL to do it's drawing. If you don't know anything about openGL, it's a graphic API for vector graphics, and a pretty large topic, with many great guides online.
-Fortunately the devs have made many tools to help us here so we don't need to start from scratch, nor massively concern ourselves with how it works. We will make use of another widget that is shipped with the game which handles the backend stuff and allows us to use a simple commands to draw text.
+BAR uses openGL to do its drawing. If you don't know anything about openGL, it's a graphic API for vector graphics, and a pretty large topic, with many great guides online.
+Fortunately the devs have made many tools to help us here so we don't need to start from scratch, nor massively concern ourselves with how it works. We will make use of another widget that is shipped with the game which handles the backend stuff and allows us to use simple commands to draw text.
 
 Draw callins - that is those which let us draw stuff, are `DrawScreen()` for drawing on the screen (think the UI), or the world `DrawWorld()` for drawing to the map (think radar overlay). These are resource expensive, so we keep as much code away from them as possible, and try to only use them to send our graphics to be drawn. If we can also reduce changing the drawing as much as possible, we greatly reduce the load on the CPU.
 
@@ -570,7 +570,7 @@ We would need to scale all these values based on screen resolution and UIScale, 
 
 ### One More Conditional
 We also need to decide when to run the `CreateHealthInfoTexture()` function. There's no point in rewriting this every frame if nothing has changed with commander hit points, so we can check against this in the previous function we wrote.
-To do this we will check if the commander unit health (or max health due to promotions) from the last check is the same as now, and if it isn't flip an update variable. We also need to flip the update if there's we get a new commander. Finally, we need to remove dead commanders from the list, or they will always be displayed (but won't clutter the code below by adding this yet). You may also see there's a `drawer` and `counter` added. This will be used when we wish to display the code on screen.
+To do this we will check if the commander unit health (or max health due to promotions) from the last check is the same as now, and if it isn't flip an update variable. We also need to flip the update if we get a new commander. Finally, we need to remove dead commanders from the list, or they will always be displayed (but won't clutter the code below by adding this yet). You may also see there's a `drawer` and `counter` added. This will be used when we wish to display the code on screen.
 Altogether, our (nearly completed) code will look like this.
 
 ```lua
@@ -585,7 +585,7 @@ local healthToDraw
 local drawer = false --If true we draw, if false we don't
 
 for udid, ud in pairs(UnitDefs) do
-	if ud.customParams.iscommander then
+	if ud.customparams.iscommander then
 		table.insert(commanderDefIDsList, udid)
 	end
 end
@@ -676,7 +676,7 @@ local healthToDraw
 local drawer = false --if true we draw, if false we don't
 
 for udid, ud in pairs(UnitDefs) do
-	if ud.customParams.iscommander then
+	if ud.customparams.iscommander then
 		table.insert(commanderDefIDsList, udid)
 	end
 end
