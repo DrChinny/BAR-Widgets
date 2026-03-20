@@ -10,28 +10,30 @@ function widget:GetInfo()
     }
 end
 
----On unit finished, unit destroyed or unit gifted, track resource cost over the past 450 gameframes.
----Decide if the unit is Army, Defense or Eco (use spect hub definitions).
----For each player, track: cumalitive of each of the above (other widget can handle differences).
----format the same as the stats from engine: [snapShotNumber][teamID][Stat]
----need a function that accepts TeamID and 2 or more required snapshots numbers.
+
+
 ---on only team id, it should return highest snapShotNumber, if all three arguments it should return the stats.
 ---Fun things to track: First T2 + time, first T3 + time, most common unit, most resource spent on unit (not buildings), llt spammer, com sniper, no. winds or t1 solar.
 ---
----Table to track certain counts of units. name[teamID][unitdefID] = {count, resourceValue}
----xxx bug - doesn't work right with AI players on init, perhaps need to do some things on frame 1 to ensure everything is loaded.
----xxx count resources in trees/rock to display on sag widget.
+---
+
+local sp_GetFeatureID = Spring.GetFeatureDefID
 local uncategorisedUnits = {} --xxx remove, for debug only
+local unclassifiedFeatureList= {} --xxx debug only
 local knowntrees = VFS.Include("modelmaterials_gl4/known_feature_trees.lua")
 local gaiaID
 local teamAllyTeamIDs = {}
 local teamIDSorted = {}
 local MasterStatTable = {}
-local caterogies = {"armyValue","defenseValue", "utilityValue","economyValue","everything"}
+local categories = {"armyValue","defenseValue", "utilityValue","economyValue","everything"}
 local temporaryStatTable = {}
 local unitDefsToTrack = {}
 local snapShotNumber = 1
-local spectator, fullview
+
+local spectator, fullview = Spring.GetSpectatingState()
+local myTeamID = Spring.GetMyTeamID()
+local myAllyTeamID = Spring.GetMyAllyTeamID()
+local playerRestricMode = false --zzz starts false
 
 local firstsWinnersList = {}
 local firstsCategoryNames = {
@@ -41,30 +43,34 @@ local firstsCategoryNames = {
     "T3Army",
 }
 local firstsCategoryList = {}
-for k, name in ipairs(firstsCategoryNames) do
+for _, name in ipairs(firstsCategoryNames) do
     firstsCategoryList[name] = false
 end 
----xxx need to change the funstat names to be like above with list auto generated. ---zzz just added defenseUnitDefs below
+local rockTracker = {maxMetal = 0, maxEnergy = 0, metalDestroyed = 0, energyDestroyed = 0, maxNumber = 0, numberDestroyed =0}
+local treeTracker = {maxMetal = 0, maxEnergy = 0, metalDestroyed = 0, energyDestroyed = 0, maxNumber = 0, numberDestroyed =0}
 local funStatsNames = {["armyUnitDefs"]=true, ["defenseUnitDefs"]=true, ["T1Army"] = true, ["T1Def"] = true, ["T2Army"] = true, ["T2Def"] = true,["T3Army"] = true, ["T2Factory"]=true, ["T2Constructor"] = true, ["llt"] = true, ["wind"] = true}
---local firstsCategoryList = {["T2Army"] = false, ["T3Army"] = false, ["T2Factory"]=false, ["T2Constructor"] = false,}
 local trackedFunStats = {}
 local unfinishedSharedUnits = {}
-local maxTrees = 0
-local destroyedTrees = 0
-local destroyedRocks = 0
+
+
 local treeListID = {}
 local rockList = {}
 local rockListID = {}
-local maxRocks = 0
 local critterList = {}
 
 local function CacheTeams() -- get all the teamID / Ally Team ID captains and colours once, and cache.
+    myTeamID = Spring.GetMyTeamID()
+	myAllyTeamID = Spring.GetMyAllyTeamID()
+    playerRestricMode = false --zzz starts false
     for _, allyTeamID in ipairs(Spring.GetAllyTeamList()) do
         for _, teamID in ipairs(Spring.GetTeamList(allyTeamID)) do
             if Spring.GetGaiaTeamID() ~= teamID then
                 table.insert(teamIDSorted,teamID)
                 teamAllyTeamIDs[teamID] = allyTeamID
                 trackedFunStats[teamID] = {}
+                if myTeamID == teamID and spectator == false and fullview == false then
+                    playerRestricMode = true
+                end
             else
                 gaiaID = teamID
             end
@@ -72,63 +78,61 @@ local function CacheTeams() -- get all the teamID / Ally Team ID captains and co
     end
 end
 
-
 local function TreeCache()
     local treeList = {}
-    unclassifiedFeatureList={}
+
     for featureDefID , featureDef in pairs(FeatureDefs) do
         local featureName = featureDef.name
         if knowntrees[featureDef.name] then
-            treeList[featureDefID] = featureName
-        end
-        if string.find(featureName,"rocks30") or string.find(featureName,"moonrock") or string.find(featureName,"crystal") or string.find(featureName,"stone")then
-            rockList[featureDefID] = featureName
+            if featureDef.metal == 0 then
+                treeList[featureDefID] = {metal = featureDef.metal, energy = featureDef.energy}
+            elseif featureDef.metal > 0 and  featureDef.customParams.category ~="corpse" then
+                Spring.Echo("metal = featureDef.metal, energy = featureDef.energy",featureDef.metal, featureDef.energy)
+                rockList[featureDefID] = {metal = featureDef.metal, energy = featureDef.energy}
+            end
         end
     end
     local featureDefID
+
     for _, featureID in pairs(Spring.GetFeaturesInRectangle(1,1,Game.mapSizeX,Game.mapSizeZ)) do
-        featureDefID = Spring.GetFeatureDefID(featureID)
+        featureDefID = sp_GetFeatureID(featureID)
         if rockList[featureDefID] then
-            rockListID[featureID] = true
-            maxRocks = maxRocks + 1
+            rockListID[featureID] = rockList[featureDefID]
+            rockTracker.maxNumber = rockTracker.maxNumber + 1
+            rockTracker.maxMetal = rockTracker.maxMetal + rockList[featureDefID].metal
+            rockTracker.maxEnergy = rockTracker.maxEnergy + rockList[featureDefID].energy
         elseif treeList[featureDefID] then
-            treeListID[featureID] = true
-            maxTrees = maxTrees + 1
-            -- if rockList[featureDefID] then --there are some tree/rock combos ><
-            --     rockListID[featureID] = true
-            --     maxRocks = maxRocks + 1
-            -- end
-        -- elseif rockList[featureDefID] then
-        --     rockListID[featureID] = true
-        --     maxRocks = maxRocks + 1
+            treeListID[featureID] = treeList[featureDefID]
+            treeTracker.maxNumber = treeTracker.maxNumber + 1
+            treeTracker.maxMetal = treeTracker.maxMetal + treeList[featureDefID].metal
+            treeTracker.maxEnergy = treeTracker.maxEnergy + treeList[featureDefID].energy
         else
             unclassifiedFeatureList[featureDefID] = FeatureDefs[featureDefID].name
         end
     end
-    Spring.Echo("Trees Found by Sag Helper:", maxTrees)
 end
 
-local function AddValuesToMasterStatsTable (key)
-    if not MasterStatTable[key] then
-        MasterStatTable[key] = {}
-        for _, category in ipairs(caterogies) do
+local function AddValuesToMasterStatsTable (time)
+    if not MasterStatTable[time] then
+        MasterStatTable[time] = {}
+        for _, category in ipairs(categories) do
             for k,teamID in ipairs (teamIDSorted) do
-                if not MasterStatTable[key][teamID] then
-                    MasterStatTable[key][teamID] = {}
-                    if MasterStatTable[key-1] then
-                        MasterStatTable[key][teamID][category] = MasterStatTable[key-1][teamID][category] + temporaryStatTable[teamID][category]
+                if not MasterStatTable[time][teamID] then
+                    MasterStatTable[time][teamID] = {}
+                    if MasterStatTable[time-1] then
+                        MasterStatTable[time][teamID][category] = MasterStatTable[time-1][teamID][category] + temporaryStatTable[teamID][category]
                     else
-                        MasterStatTable[key][teamID][category] = temporaryStatTable[teamID][category]
+                        MasterStatTable[time][teamID][category] = temporaryStatTable[teamID][category]
                     end
                 else
-                    if MasterStatTable[key-1] then
-                        MasterStatTable[key][teamID][category] = MasterStatTable[key-1][teamID][category] + temporaryStatTable[teamID][category]
+                    if MasterStatTable[time-1] then
+                        MasterStatTable[time][teamID][category] = MasterStatTable[time-1][teamID][category] + temporaryStatTable[teamID][category]
                     else
-                        MasterStatTable[key][teamID][category] = temporaryStatTable[teamID][category]
+                        MasterStatTable[time][teamID][category] = temporaryStatTable[teamID][category]
                     end
                 end
-                if MasterStatTable[key][teamID][category] < 0 then
-                    MasterStatTable[key][teamID][category] = 0
+                if MasterStatTable[time][teamID][category] < 0 then
+                    MasterStatTable[time][teamID][category] = 0
                 end
             end
         end
@@ -219,8 +223,8 @@ local function buildUnitDefs()
     end
 
     local function isArmyUnit(unitDefID, unitDef)
-        -- anything with a least one weapon and speed above zero is considered an army unit
-        return unitDef.weapons and (#unitDef.weapons > 0) and unitDef.speed and (unitDef.speed > 0)
+        -- anything with a least one weapon and speed above zero is considered an army unit, not commanders
+        return unitDef.weapons and (#unitDef.weapons > 0) and unitDef.speed and (unitDef.speed > 0) and not unitDef.customParams.iscommander
     end
 
     local function isDefenseUnit(unitDefID, unitDef)
@@ -228,7 +232,7 @@ local function buildUnitDefs()
     end
 
     local function isUtilityUnit(unitDefID, unitDef)
-        return unitDef.customParams.unitgroup == 'util'
+        return unitDef.customParams.unitgroup == 'util' or unitDef.transportSize 
     end
 
     local function isEconomyBuilding(unitDefID, unitDef)
@@ -272,7 +276,7 @@ local function buildUnitDefs()
     end
 
     
-    --main caterogies
+    --main categories
     unitDefsToTrack = {}
     unitDefsToTrack.commanderUnitDefs = {}
     unitDefsToTrack.reclaimerUnitDefs = {}
@@ -282,7 +286,7 @@ local function buildUnitDefs()
     unitDefsToTrack.defenseUnitDefs = {}
     unitDefsToTrack.utilityUnitDefs = {}
     unitDefsToTrack.economyBuildingDefs = {}
-    --fun track caterogies
+    --fun track categories
     --unitDefsToTrack.T1Spam = {}
     unitDefsToTrack.T1Def = {}
     unitDefsToTrack.T2Def = {}
@@ -364,11 +368,11 @@ local function DetermineCategoryAndValue(unitDefID) --note a unit cannot by in m
 	if unitDefsToTrack.defenseUnitDefs[unitDefID] then
         return "defenseValue", unitDefsToTrack.defenseUnitDefs[unitDefID][1] --{name, value}
 	end
-	if unitDefsToTrack.utilityUnitDefs[unitDefID] then
-        return "utilityValue", unitDefsToTrack.utilityUnitDefs[unitDefID][1] --{name, value}
-	end
 	if unitDefsToTrack.economyBuildingDefs[unitDefID] then
         return "economyValue", unitDefsToTrack.economyBuildingDefs[unitDefID][1] --{name, value}
+	end
+    if unitDefsToTrack.utilityUnitDefs[unitDefID] then
+        return "utilityValue", unitDefsToTrack.utilityUnitDefs[unitDefID][1] --{name, value}
 	end
     return nil,nil
 end
@@ -381,7 +385,7 @@ end
 
 
 local function ClearTemporyStatTable ()
-    for _, category in ipairs(caterogies) do
+    for _, category in ipairs(categories) do
         for key,teamID in ipairs(teamIDSorted) do
             if not temporaryStatTable[teamID] then
                 temporaryStatTable[teamID] = {}
@@ -400,60 +404,70 @@ local function RunSnapshotUpdate()
     WG['saghelper'].masterStatTable = MasterStatTable
     WG['saghelper'].trackedFunStats = trackedFunStats
     WG['saghelper'].firstsWinnersList = firstsWinnersList
-    if maxTrees > 0 then
-        WG['saghelper'].trees = {["maxTrees"] = maxTrees, ["destroyedTrees"] = destroyedTrees}
+    if treeTracker.maxNumber > 0 then
+        WG['saghelper'].trees = {maxMetal = treeTracker.maxMetal, maxEnergy = treeTracker.maxEnergy, metalDestroyed = treeTracker.metalDestroyed, energyDestroyed = treeTracker.energyDestroyed, maxNumber = treeTracker.maxNumber, numberDestroyed =treeTracker.numberDestroyed}
     end
-    if maxRocks > 0 then
-        WG['saghelper'].rocks = {["maxRocks"] = maxRocks, ["destroyedRocks"] = destroyedRocks}
+    if rockTracker.maxNumber > 0 then
+        WG['saghelper'].rocks = {maxMetal = rockTracker.maxMetal, maxEnergy = rockTracker.maxEnergy, metalDestroyed = rockTracker.metalDestroyed, energyDestroyed = rockTracker.energyDestroyed, maxNumber = rockTracker.maxNumber, numberDestroyed =rockTracker.numberDestroyed}
     end
     if #critterList >0 then
         WG['saghelper'].critterList = critterList
     end
 end
 
-function widget:UnitFinished(unitID, unitDefID, teamID) --xxx need to check rez bots 
-    local category, value = DetermineCategoryAndValue(unitDefID)
-    --Spring.Echo("unit finished", teamID,category,value)
-    if category then
-        AddStatToTemporaryStatTable(teamID,category,value)
-        StatTracking(teamID,unitDefID,value,unitID,false)
-        unfinishedSharedUnits[unitID] = nil
-    else
-        if teamID == gaiaID and string.find(UnitDefs[unitDefID].name,"critter_") then
-            Spring.Echo("Critter found:",UnitDefs[unitDefID].name)
-            critterList[#critterList+1] = {unitID=unitID,unitdDefID=unitDefID, name=UnitDefs[unitDefID].name}
+function widget:UnitFinished(unitID, unitDefID, teamID) --xxx need to check rez bots
+    if playerRestricMode == false or (playerRestricMode == true and teamAllyTeamIDs[teamID] == myAllyTeamID) then
+        if teamID ~= gaiaID then
+            local category, value = DetermineCategoryAndValue(unitDefID)
+            --Spring.Echo("unit finished", teamID,category,value)
+            if category then
+                AddStatToTemporaryStatTable(teamID,category,value)
+                StatTracking(teamID,unitDefID,value,unitID,false)
+                unfinishedSharedUnits[unitID] = nil
+            else
+                Spring.Echo("Debug - this unit isn't in any categories:", unitID, unitDefID, teamID, UnitDefs[unitDefID].translatedHumanName)
+                uncategorisedUnits[unitDefID] = UnitDefs[unitDefID].translatedHumanName
+            end
         else
-            Spring.Echo("Debug - this unit isn't in any caterogies:", unitID, unitDefID, teamID, UnitDefs[unitDefID].translatedHumanName)
-            uncategorisedUnits[unitDefID] = UnitDefs[unitDefID].translatedHumanName
+            if string.find(UnitDefs[unitDefID].name,"critter_") then
+                Spring.Echo("Critter found:",UnitDefs[unitDefID].name)
+                critterList[#critterList+1] = {unitID=unitID,unitdDefID=unitDefID, name=UnitDefs[unitDefID].name}
+            else
+                Spring.Echo("Debug - this unit isn't in any categories gaia:", unitID, unitDefID, teamID, UnitDefs[unitDefID].translatedHumanName)
+                uncategorisedUnits[unitDefID] = UnitDefs[unitDefID].translatedHumanName
+            end
         end
     end
-
 end
 
 function widget:UnitDestroyed(unitID, unitDefID, teamID)
-    if Spring.GetUnitIsBeingBuilt(unitID) or teamID == gaiaID then
-        return
-    end
-    local category, value = DetermineCategoryAndValue(unitDefID)
-    --Spring.Echo("unit finished", teamID,category,value)
-    if category then
-        AddStatToTemporaryStatTable(teamID,category,-value)
-        StatTracking(teamID,unitDefID,value, unitID, true)
+    if playerRestricMode == false or (playerRestricMode == true and teamAllyTeamIDs[teamID] == myAllyTeamID) then
+        if Spring.GetUnitIsBeingBuilt(unitID) or teamID == gaiaID then
+            return
+        end
+        local category, value = DetermineCategoryAndValue(unitDefID)
+        --Spring.Echo("unit finished", teamID,category,value)
+        if category then
+            AddStatToTemporaryStatTable(teamID,category,-value)
+            StatTracking(teamID,unitDefID,value, unitID, true)
+        end
     end
 end
 
 function widget:UnitGiven(unitID, unitDefID, newTeamID, oldTeamID)
-    if Spring.GetUnitIsBeingBuilt(unitID) then
-        unfinishedSharedUnits[unitID] = {newTeamID,oldTeamID}
-        return
-    end
-    if newTeamID >=0 and oldTeamID >= 0 then
-        local category, value = DetermineCategoryAndValue(unitDefID)
-        if category and newTeamID ~=gaiaID then
-            AddStatToTemporaryStatTable(newTeamID,category,value)
+    if playerRestricMode == false or (playerRestricMode == true and teamAllyTeamIDs[oldTeamID] == myAllyTeamID) then
+        if Spring.GetUnitIsBeingBuilt(unitID) then
+            unfinishedSharedUnits[unitID] = {newTeamID,oldTeamID}
+            return
         end
-        if category and oldTeamID ~=gaiaID then
-            AddStatToTemporaryStatTable(oldTeamID,category,-value)
+        if newTeamID >=0 and oldTeamID >= 0 then
+            local category, value = DetermineCategoryAndValue(unitDefID)
+            if category and newTeamID ~=gaiaID then
+                AddStatToTemporaryStatTable(newTeamID,category,value)
+            end
+            if category and oldTeamID ~=gaiaID then
+                AddStatToTemporaryStatTable(oldTeamID,category,-value)
+            end
         end
     end
 end
@@ -467,8 +481,10 @@ local function Catchup()
             local teamID = Spring.GetUnitTeam(unitID)
             local category, value = DetermineCategoryAndValue(unitDefID)
             if teamID ~= gaiaID and category then
-                AddStatToTemporaryStatTable(teamID,category,value)
-                StatTracking(teamID,unitDefID,value,unitID,false)
+                if playerRestricMode == false or (playerRestricMode == true and teamAllyTeamIDs[teamID] == myAllyTeamID) then
+                    AddStatToTemporaryStatTable(teamID,category,value)
+                    StatTracking(teamID,unitDefID,value,unitID,false)
+                end
             else
                 Spring.Echo("gaia or nil",teamID,unitID, UnitDefs[unitDefID].translatedHumanName, UnitDefs[unitDefID].name)
                 if teamID == gaiaID and string.find(UnitDefs[unitDefID].name,"critter_") then
@@ -488,7 +504,9 @@ local function Init()
     local n = Spring.GetGameFrame()
     snapShotNumber = math.floor((n /450))+1
     buildUnitDefs()
-    Catchup()
+    if n > 1 then --only needed if widget crashes/turned off
+        Catchup()
+    end
 end
 
 function widget:Initialize()
@@ -499,18 +517,15 @@ end
 function widget:TextCommand(command)
     if string.find(command, "bag",nil,true) then
         Spring.Echo("bag ran")
-        Spring.Echo("unfinishedSharedUnits",unfinishedSharedUnits)
+       -- Spring.Echo("unfinishedSharedUnits",unfinishedSharedUnits)
         Spring.Echo("uncategorisedUnits",uncategorisedUnits)
-        Spring.Echo("unclassifiedFeatureList",unclassifiedFeatureList)
-        Spring.Echo("tree",maxTrees)
-        Spring.Echo("maxRocks",maxRocks)
-        for featureDefID,name in pairs(rockList) do
-            Spring.Echo(name)
+        for _, teamID in ipairs(teamIDSorted) do
+            Spring.Echo(teamID,"MasterStatTable[time]",MasterStatTable[snapShotNumber-1][teamID]["economyValue"])
+            Spring.Echo(teamID,"MasterStatTable[time]",MasterStatTable[snapShotNumber-1][teamID]["armyValue"])  
         end
-        Spring.Echo("critterList",critterList)
-        Spring.Echo("unitDefsToTrack.T2Def",unitDefsToTrack.T2Def)
-        -- Spring.Echo("teamAllyTeamIDs" ,teamAllyTeamIDs)
-        -- Spring.Echo("trackedFunStats",trackedFunStats)
+        
+        --Spring.Echo("unclassifiedFeatureList",unclassifiedFeatureList)
+        --Spring.Echo("WG['saghelper'].trees",WG['saghelper'].trees)
     end
 end
 
@@ -528,8 +543,12 @@ end
 
 function widget:FeatureDestroyed(featureID, allyTeamID)
     if treeListID[featureID] then
-        destroyedTrees = destroyedTrees + 1
+        treeTracker.numberDestroyed = treeTracker.numberDestroyed + 1
+        treeTracker.metalDestroyed = treeTracker.metalDestroyed + treeListID[featureID].metal
+        treeTracker.energyDestroyed = treeTracker.energyDestroyed + treeListID[featureID].energy
     elseif rockListID[featureID] then
-        destroyedRocks = destroyedRocks + 1
+        rockTracker.numberDestroyed = rockTracker.numberDestroyed + 1
+        rockTracker.metalDestroyed = rockTracker.metalDestroyed + rockListID[featureID].metal
+        rockTracker.energyDestroyed = rockTracker.energyDestroyed + rockListID[featureID].energy
     end
 end
