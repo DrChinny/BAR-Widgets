@@ -3,10 +3,10 @@ function widget:GetInfo()
       name      = "SAG",
       desc      = "Displaying Stacked Area Graphs",
       author    = "Mr_Chinny",
-      date      = "Feb 2026",
+      date      = "March 2026",
       handler   = true,
       enabled   = true,
-      layer = 1 --xxx must load be later than the advanced player list, sag helper
+      layer = 1 --must load be later than the topbar, sag helper
     }
 end
 
@@ -76,7 +76,7 @@ local spectator, fullview = Spring.GetSpectatingState()
 
 
 
-local sagHighlight = nil
+local sagHighlight = false
 local displayGraph = "energyProduced"
 
 
@@ -136,7 +136,7 @@ local trackedStatsNames = {
     {name = "damageDealtCum", displayName = "   Total\nDamage", perSec = 0, spare = 0, type = "Damage"},
     {name = "damageDealt", displayName = "Damage\n   Dealt", perSec = 1, spare =0, type = "Damage"},
     {name = "damageReceived", displayName = "Damage\nReceived", perSec = 1, spare = 0, type = "Damage"},
-    {name = "unitsCaptured", displayName = "    Units\nCaptured" , perSec = 0, spare = 0, type = "Units"},
+    {name = "unitsSent", displayName = "Unit\nSent" , perSec = 0, spare = 0, type = "Units"},
     {name = "unitsKilled", displayName = "Units\nKilled" , perSec = 0, spare = 0, type = "Units"},
     {name = "unitsProduced", displayName = "    Units\nProduced" , perSec = 0, spare = 0, type = "Units"},
     
@@ -158,7 +158,8 @@ local trackedStatsNames = {
     --{name = "unitsDied", displayName = "Units \n Died" , perSec = 0, spare = 1, type = "Units"}, 
     --{name = "unitsOutCaptured", displayName = "Units Out \n captured" ,perSec = 0, spare = 0, type = "Units"},   
     --{name = "unitsReceived", displayName = "Units \n Received" , perSec = 0, spare = 0, type = "Units"},
-    --{name = "unitsSent", displayName = "Unit \n Sent" , perSec = 0, spare = 0, type = "Units"},
+    --
+    --{name = "unitsCaptured", displayName = "    Units\nCaptured" , perSec = 0, spare = 0, type = "Units"},
     --{name = "energyReceived", displayName = "Energy \n Received" , perSec = 0, spare = 0, type = "Energy"},
     --{name = "energyUsed", displayName = "Energy \n Used" , perSec = 1, spare = 0, type = "Energy"},
 }
@@ -639,13 +640,18 @@ local function UpdateDrawingPositions(updateName) ---need to run on viewchange e
     if updateName == "mainToggle" then
         local buttonSizeX, buttonSizeY = 80,60
         local topBarPosition
-        local paddingX = 10
+        local paddingX, paddingY = 10,0
         if WG['topbar'] then
             topBarPosition = WG['topbar'].GetFreeArea()
         else
             topBarPosition{vsx,vsy,vsx,vsy} --xxx better defaults
         end
-        screenPositions.GraphOnOffButton = {l = topBarPosition[3] - buttonSizeX - paddingX , b = topBarPosition[2], r = topBarPosition[3] - paddingX, t = topBarPosition[2] + buttonSizeY}
+        if gameOver == true then
+            paddingY = topBarPosition[4]-topBarPosition[2]
+            Spring.Echo(paddingY)
+        end
+
+        screenPositions.GraphOnOffButton = {l = topBarPosition[3] - buttonSizeX - paddingX , b = topBarPosition[2] - paddingY, r = topBarPosition[3] - paddingX, t = topBarPosition[2] + buttonSizeY - paddingY}
         screenPositions.StatsOnOffButton = {l = screenPositions.GraphOnOffButton.l- buttonSizeX, b = screenPositions.GraphOnOffButton.b, r = screenPositions.GraphOnOffButton.l, t = screenPositions.GraphOnOffButton.t}
     end
 
@@ -1761,9 +1767,36 @@ function widget:TextCommand(command)
     end
 
     if string.find(command, "extra", nil, true) then
-
+        if toggleTable["extraStats"] == false then
+            toggleTable["extraStats"] = true
+            toggleTable["graphSAG"] = false
+            DeleteLists("all")
+            drawer = true
+            RefreshLists("extra")
+            PlaySound("buttonclick")
+        else
+            toggleTable["extraStats"] = false
+            drawer = false
+            DeleteLists("all")
+            DrawGraphToggleButton()
+            PlaySound("buttonclick")
+        end
     end
     if string.find(command, "graph", nil, true) then
+        if toggleTable["graphSAG"] == false then
+            toggleTable["graphSAG"] = true
+            toggleTable["extraStats"] = false
+            DeleteLists("all")
+            drawer = true
+            RefreshLists("all")
+            PlaySound("buttonclick")
+        else
+            toggleTable["graphSAG"] = false
+            drawer = false
+            DeleteLists("all")
+            DrawGraphToggleButton()
+            PlaySound("buttonclick")
+        end
 
     end
 
@@ -1954,10 +1987,10 @@ function widget:MousePress(mx, my, button) --xxx need to add a bool to each func
         if bool and columnNumber then
             if (sagHighlight and sagHighlight == columnNumber) then
                 toggleTable["details"] = false
-                sagHighlight = nil
+                sagHighlight = false
             elseif columnNumber > snapShotNumber/squishFactor then
                 toggleTable["details"] = false
-                sagHighlight = nil
+                sagHighlight = false
             else
                 sagHighlight = columnNumber
                 toggleTable["details"] = true
@@ -2061,7 +2094,7 @@ function widget:MousePress(mx, my, button) --xxx need to add a bool to each func
     end
     if clickedEmptySpace == true and toggleTable["graphSAG"] and sagHighlight then
         toggleTable["details"] = false
-        sagHighlight = nil
+        sagHighlight = false
         RefreshLists("all")
     elseif clickedEmptySpace == true then
         DeleteLists("most")
@@ -2076,6 +2109,9 @@ function widget:GameOver()
     playerRestricMode = false
     toggleTable["graphSAG"] = true
     CompleteStatsExtract()
+    UpdateDrawingPositions("mainToggle")
+    UpdateDrawingPositions("funStats")
+    RefreshLists("all")
 end
 
 function widget:UnitFinished(unitID, unitDefID, teamID) --xxx need to check rez bots
