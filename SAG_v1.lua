@@ -10,13 +10,13 @@ function widget:GetInfo()
     }
 end
 
-
 ---Things to do---
+---xxx sort out delete lists, refreshes, and a easy function to run all of these neatly.
 ---xxx if free for all, or too many players, adjust accordingly
 ---xxx anonymousMode mode
 ---other inetersting stats. ping, pingspam, messages, most t1, most metal spent on unit type? highest point a unit is, wind direction?
----Shader for efficency.
----Commander Deaths/rez
+---Shader for efficency?
+---Commander Deaths/rez - have the helper recrod frame that a com dies on (an killer once a gadget), then display as a graph overlay.
 ---Disable data gathering if not spec/fullview, enlable on game over
 ---similar I need to be able to have human or translateable names for all titles, these can be in the same list as above.
 ---xxx bug - doesn't work right with AI players on init, perhaps need to do some things on frame 1 to ensure everything is loaded.
@@ -43,52 +43,46 @@ local spGetTeamColor            = Spring.GetTeamColor
 local playSounds = true
 local sounds = {buttonclick = 'LuaUI/Sounds/buildbar_waypoint.wav', duck = 'Sounds/critters/duckcall1.wav'}
 
-
----FlowUI---
-local UiElement
-local RectRound
-local bgpadding 
-
-local elementColours = {{0,0,0.0,0.6},{1,1,1,0.05}}
-local oddLineColour = {0.28,0.28,0.28,0.08}
-local evenLineColour = {1,1,1,0.08}
-local sortLineColour = {0.82,0.82,0.82,0.1}
-local buttonColour      = {{{1,1,1,0.2},{0.5,0.5,0.5,0.2}},{{0,0,0,0.3},{0.5,0.5,0.5,0.3}}}
-local drawExtraStats
-local drawStackedAreaGraphs
-local drawStackedAreaGraphAxis
-local drawButtonGraphs
-local drawButtonsForSelections
-local drawFixedElements
-local maxRowHeight
-local fontSize = 18
-local fontSizeS = ceil(fontSize*.67)
-local fontSizeL = ceil(fontSize * 2)
-local font
-local boarderWidth, screenRatio
-
 ---GameVariables
 local minWind = Game.windMin
 local maxWind = Game.windMax
 local gaiaID = Spring.GetGaiaTeamID()
 local vsx, vsy = Spring.GetViewGeometry()
 local spectator, fullview = Spring.GetSpectatingState()
+local myTeamID = Spring.GetMyTeamID()
+local myAllyTeamID = Spring.GetMyAllyTeamID()
+local myTeamList = Spring.GetTeamList(myAllyTeamID)
 
+---FlowUI---
+local UiElement
+local RectRound
+local bgpadding 
+local elementColours = {{0,0,0.0,0.6},{1,1,1,0.05}}
+local oddLineColour = {0.28,0.28,0.28,0.08}
+local evenLineColour = {1,1,1,0.08}
+local sortLineColour = {0.82,0.82,0.82,0.1}
+local buttonColour      = {{{1,1,1,0.2},{0.5,0.5,0.5,0.2}},{{0,0,0,0.3},{0.5,0.5,0.5,0.3}}}
+local drawExtraStats --reduce these down, don't need them all?
+local drawStackedAreaGraphs
+local drawStackedAreaGraphAxis
+local drawButtonGraphs
+local drawButtonsForSelections
+local drawFixedElements
+local maxRowHeight
+local boarderWidth
+local font
+local screenRatio = vsy/1080
+local fontSize = 18 * screenRatio
+local fontSizeS = ceil(fontSize*.67)
+local fontSizeL = ceil(fontSize * 2)
 
-
-local sagHighlight = false
-local displayGraph = "energyProduced"
-
-
-local WindDescriptionText = {"None",0,"None",0}
-local windDescriptionList = {"GALES!","Gusty","Average","Light","Becalmed"}
-local suffix = {"st","nd","rd","th","th","th","th","th","th","th","th","th","th","th","th"}
-
-
+local sagHighlight = false --bar chart # selected
+local displayGraph = "energyProduced" --graph to be displayed
+local sortVar = "AllArmy" --extra stats type to sort by
 
 ---UserPreference
-local squishFactorSetPoint = 40 --max number of bars on the chart before we need to start averaging or ignoring results.
-local windCheckInterval = 60 --How often wind speed is checked and recorded (in frames)
+local squishFactorSetPoint = 40 --max number of bars on the chart before we need to start merging them together and averaging results.
+local windCheckInterval = 60 --How often wind speed is checked and recorded (in frames), lower is smoother
 
 ---Local Caches---
 local allyTeamColourCache = {}
@@ -115,8 +109,24 @@ local sagTeamTableStats = {}
 local sagCompareTableStats = {} --for current category only, with current camparison list
 local comparisonTeamIDs = {}
 
+---string lists---
+local WindDescriptionText = {"None",0,"None",0}
+local windDescriptionList = {"GALES!","Gusty","Average","Light","Becalmed"}
 
+local suffix = {"st","nd","rd","th","th","th","th","th","th","th","th","th","th","th","th"}
 local valuesOnYAxis = {"0","0","0"} --3 values to display on y Axis
+local milestonesCategoryNames = {
+    "T2Factory",
+    "T2Constructor",
+    "T2Army",
+    "T3Army",
+    "50KDamage",
+    "100KDamage",
+    "500KDamage",
+    "500Energy",
+    "1KEnergy",
+    "10kEnergy",
+}
 
 local milestonesResourcesNameSorted = {"50KDamage","100KDamage","500KDamage","500Energy", "1KEnergy","10KEnergy"}
 local milestonesResourcesList ={}
@@ -163,7 +173,7 @@ local trackedStatsNames = {
     --{name = "energyReceived", displayName = "Energy \n Received" , perSec = 0, spare = 0, type = "Energy"},
     --{name = "energyUsed", displayName = "Energy \n Used" , perSec = 1, spare = 0, type = "Energy"},
 }
-local sortVar = "AllArmy"
+
 local extraStatNames = {
     {name ="AllArmy", type = "armyUnitDefs", display = "1", displayName = "Army"},
     {name ="T1Army",type = "T1Army", display = "1", displayName = "T1 Army"},
@@ -176,24 +186,10 @@ local extraStatNames = {
     {name ="T3ArmyTime",type =  "T3Army", display = "time", displayName = "T3 Army\nTime"},
     {name ="lltNumber" ,type = "llt", display = "1", displayName = "Custom\nLLT"},
     {name ="windNumber",type = "wind", display = "1", displayName = "Custom\nWind"},
-
 }
 
-local milestonesCategoryNames = {
-    "T2Factory",
-    "T2Constructor",
-    "T2Army",
-    "T3Army",
-    "50KDamage",
-    "100KDamage",
-    "500KDamage",
-    "500Energy",
-    "1KEnergy",
-    "10kEnergy",
-}
 local extraStatsTable = {}
 local extraStatsTableAlly = {}
---local graphControlButtons = {"Absolute","Team Colours","WindSpeed Overlay","Compare"}
 local graphControlButtons = {
     {name = "absolute", displayName = "Absolute"},
     {name = "teamColour", displayName = "Team Colours"},
@@ -206,12 +202,10 @@ for _,data in ipairs(trackedStatsNames) do
 end
 
 
-
-
 local function Seed(playerID)
     local customtable = select(11, Spring.GetPlayerInfo(playerID))
     if customtable.accountid and customtable.skilluncertainty then
-        seed = floor(customtable.accountid/customtable.skilluncertainty) or 1
+        local seed = floor(customtable.accountid/customtable.skilluncertainty) or 1
         return seed
     else
         return 1
@@ -467,15 +461,20 @@ local function CritterCheck()
         if not critterOfTheDay.flavour then
             critterOfTheDay.flavour = ""
             local flavour = {}
-            local flavourCategories = {"Name","Age","Gender","Hobbies","Children"}
+            local flavourCategories = {"Name","Age","Gender","Intelligence","Hobbies","Children"}
             local flavourCategoriesList = {}
-            flavourCategoriesList.Name = {"Bobby","Alex","Sam","Gurte", "Charlie", "Robin", }
+            flavourCategoriesList.Name = {"Bobby","Alex","Sam","Gurte", "Charlie", "Robin", "Anno",} --temp unisex names
             flavourCategoriesList.Age = {"Child", "Juvenile", "Adolescent","Young Adult", "In its Prime", "Middle Aged","Elderly"}
+            flavourCategoriesList.Intelligence = {"Smart", "Dumb", "Average", "Genius", "Boarderline", "gifted", "Extremely Low", "Balance Whiner"  }
             flavourCategoriesList.Gender = {"Male","Female","Other","Prefer not to say"}
-            flavourCategoriesList.Hobbies = {"Frolicking","Questing","Gaming","Improvisational comedy","Reading", "Hunting", "Nerd"}
+            flavourCategoriesList.Hobbies = {"Frolicking","Questing", "Bully", "Gaming","Improvisational comedy","Reading", "Hunting", "Nerd", "BAR",}
             flavourCategoriesList.Children = {"None","Maybe one Day","On the Way","1","2","3","So Many",}
             for key, category in ipairs(flavourCategories) do
-                flavour[key] = category..": "..flavourCategoriesList[category][Seed(0) % #flavourCategoriesList[category] + 1].."\n"
+                if key ~= #flavourCategories then
+                    flavour[key] = category..": "..flavourCategoriesList[category][Seed(0) % #flavourCategoriesList[category] + 1].."\n"
+                else
+                    flavour[key] = category..": "..flavourCategoriesList[category][Seed(0) % #flavourCategoriesList[category] + 1]
+                end
             end
             for i = 1, #flavour do
                 critterOfTheDay.flavour = critterOfTheDay.flavour..flavour[i]
@@ -488,9 +487,6 @@ local function SortExtraStats()
     sortVar = sortVar or "AllArmy"
     local tempTable = {}
     for teamID, teamAllyTeamID in pairs(teamAllyTeamIDs) do
-        -- if not tempTable[teamAllyTeamID] then
-        --     tempTable[teamAllyTeamID] = {}
-        -- end
         if playerRestricMode then
             if teamAllyTeamID == myAllyTeamID then
                 if not tempTable[teamAllyTeamID] then
@@ -504,8 +500,6 @@ local function SortExtraStats()
             end
             tempTable[teamAllyTeamID][teamID] = extraStatsTable[teamID][sortVar][extraStatsTypeToDisplayList[extraStatsTypeToDisplayCounter].name] or extraStatsTable[teamID][sortVar].valueCurrent
         end
-
-        --tempTable[teamAllyTeamID][teamID] = extraStatsTable[teamID][sortVar][extraStatsTypeToDisplayList[extraStatsTypeToDisplayCounter].name] or extraStatsTable[teamID][sortVar].valueCurrent
     end
     extraStatsSortedTable = {}
     for teamAllyTeamID, list1 in pairs(tempTable) do
@@ -519,8 +513,6 @@ local function SortExtraStats()
         extraStatsSortedTable[teamAllyTeamID] = list2
     end
 end
-
-
 
 local function CreateExtraStatsText()
     for teamID,allyTeamID in pairs(teamAllyTeamIDs) do
@@ -658,15 +650,12 @@ local function UpdateDrawingPositions(updateName) ---need to run on viewchange e
     --All fixed parts of main display (Boarder for each area, X and Y axis blips) since these are all relative to main boarder.
     if updateName == "main" then
         local sizeX, sizeY = vsx/3.5,vsy/2 --xxx x and y offset need to be relative to either screen size or another widget
-        screenRatio = 1 --xxx this needs to be set according to the screen resolution. maybe can remove as now I as a ratio of vsx and vsy?
         boarderWidth = 20 * screenRatio
         maxRowHeight = vsy/40 --xxx check value
 
         local posXl = ((vsx/3) - boarderWidth) * screenRatio
         local posYb = ((vsy/5) - boarderWidth) * screenRatio
-        --local posXr = ((vsx/3) + sizeX + boarderWidth) *screenRatio
-        --local posYt = ((vsy/5) + sizeY + boarderWidth) * screenRatio
-        
+
         screenPositions.graphs = {}
         screenPositions.graphs = {
             l = posXl + boarderWidth,             --left
@@ -1546,9 +1535,8 @@ local function RankData(time,category)
     end
 end
 
-local function APMStatsExtract()
-    local teamAPM = WG.teamAPM
-    for teamID,APM in pairs(teamAPM) do
+local function APMStatsExtract() --xxx move this to SAGHELPER
+    for teamID,APM in pairs(WG.teamAPM) do
         if teamID ~=gaiaID and APM < 1800 then --APM on time 0 seems to be 1800, look into this.
             AddInfoToSagTable(teamID,"APM",APM,snapShotNumber)
         end
@@ -1564,7 +1552,6 @@ local function APMStatsExtract()
             AddInfoToSagTable(teamID,"FPS",fps,snapShotNumber)   
         end
     end
-
     RankData(snapShotNumber,"APM")
     RankData(snapShotNumber,"FPS")
 end
@@ -2114,9 +2101,22 @@ function widget:GameOver()
     RefreshLists("all")
 end
 
-function widget:UnitFinished(unitID, unitDefID, teamID) --xxx need to check rez bots
-    --Spring.Echo("unitfinsihed",unitID, unitDefID, teamID)
+function widget:PlayerChanged()
+	spectator, fullview = Spring.GetSpectatingState()
+    if spectator == true or true == true then
+        playerRestricMode = false
+    end
 end
 
-
-
+function widget:ViewResize()
+	vsx,vsy = Spring.GetViewGeometry()
+	screenRatio = (vsy / 1080)
+	font = WG['fonts'].getFont()
+	bgpadding = WG.FlowUI.elementPadding
+	RectRound = WG.FlowUI.Draw.RectRound
+	UiElement = WG.FlowUI.Draw.Element
+    UpdateDrawingPositions("main")
+    UpdateDrawingPositions("mainToggle")
+    UpdateDrawingPositions("funStats")
+    RefreshLists("all")
+end
