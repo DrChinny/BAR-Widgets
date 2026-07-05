@@ -1536,24 +1536,26 @@ local function RankData(time,category)
 end
 
 local function APMStatsExtract() --xxx move this to SAGHELPER
-    for teamID,APM in pairs(WG.teamAPM) do
-        if teamID ~=gaiaID and APM < 1800 then --APM on time 0 seems to be 1800, look into this.
-            AddInfoToSagTable(teamID,"APM",APM,snapShotNumber)
-        end
-    end
-
-    local teamfps = WG.playerFPS
-    local fps = 0
-    for teamID, _ in pairs (teamAllyTeamIDs) do
-        if teamID ~=gaiaID then
-            if teamfps[teamID] then 
-                fps = teamfps[teamID]
+    if WG.teamAPM then
+        for teamID,APM in pairs(WG.teamAPM) do
+            if teamID ~=gaiaID and APM < 1800 then --APM on time 0 seems to be 1800, look into this.
+                AddInfoToSagTable(teamID,"APM",APM,snapShotNumber)
             end
-            AddInfoToSagTable(teamID,"FPS",fps,snapShotNumber)   
         end
+
+        local teamfps = WG.playerFPS
+        local fps = 0
+        for teamID, _ in pairs (teamAllyTeamIDs) do
+            if teamID ~=gaiaID then
+                if teamfps[teamID] then 
+                    fps = teamfps[teamID]
+                end
+                AddInfoToSagTable(teamID,"FPS",fps,snapShotNumber)   
+            end
+        end
+        RankData(snapShotNumber,"APM")
+        RankData(snapShotNumber,"FPS")
     end
-    RankData(snapShotNumber,"APM")
-    RankData(snapShotNumber,"FPS")
 end
 
 
