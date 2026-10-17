@@ -55,6 +55,7 @@ end
 local custom_keybind_mode       = false --  Set to true for custom keybind, false for hotkeys defined in this code. xxx Always change to false before release.
 local hotkeys                   = {106,107} -- Alt-j /Alt-k bound. Only needed if custom_keybind_mode is set false. For Reference: 106 = j .Shift/Alt requirements must be changed on keypress function 
 local hideEnergy                = false -- This will remove any displayed Energy. Currently only changable with this value.
+local Utilities                 = (BAR and BAR.Utilities) or Spring.Utilities
 ---------------------------------------------------------------------------------
 --Drawing and Scaling
 ---------------------------------------------------------------------------------
@@ -258,7 +259,7 @@ end
 
 local function FindAllPlayersOnAllyTeam() --creates a list with all allys per team, inc players and AI, stores colours too.
     allyTeamList ={}
-    local numberOfTeams = Spring.Utilities.GetAllyTeamCount()
+    local numberOfTeams = Utilities.GetAllyTeamCount()
     for i= 0, numberOfTeams-1 do --all"real" teams (no gaia (or raptors?))
         local counter = 1
         for _,teamID in pairs(Spring.GetTeamList(i)) do
@@ -274,9 +275,13 @@ local function FindAllPlayersOnAllyTeam() --creates a list with all allys per te
                     allyTeamList[i+1][name] = {order = counter , colour = {r =r ,g=g, b=b}}
                 end
             else --Ai or something else
-                local a,b,allyTeamID,isAI,e,f,g,h,w,r,t,y  =  Spring.GetAIInfo(teamID)
+                local _, _, _, isAI = Spring.GetTeamInfo(teamID, false)
                 if isAI then
                     local name = Spring.GetGameRulesParam('ainame_' .. teamID)
+                    if not name then
+                        local _, aiName = Spring.GetAIInfo(teamID)
+                        name = (aiName or "AI") .. " (team " .. teamID .. ")"
+                    end
                     local r,g,b = Spring.GetTeamColor(teamID)
                     allyTeamList[i+1][name] = {order = counter , colour = {r =r ,g=g, b=b}}
                 end        
@@ -891,7 +896,7 @@ function widget:Shutdown() --release all values
     if settingChangeTexture then
 		gl_DeleteList(settingChangeTexture)
 	end
-    if printList then
+    if printList and WG['tooltip'] then
         for i=1, #printList do --clean up tooltips before changing the printvalue
             WG['tooltip'].RemoveTooltip("metal tracker tooltip"..i)
         end
