@@ -55,6 +55,7 @@ end
 local custom_keybind_mode       = false --  Set to true for custom keybind, false for hotkeys defined in this code. xxx Always change to false before release.
 local hotkeys                   = {106,107} -- Alt-j /Alt-k bound. Only needed if custom_keybind_mode is set false. For Reference: 106 = j .Shift/Alt requirements must be changed on keypress function 
 local hideEnergy                = false -- This will remove any displayed Energy. Currently only changable with this value.
+local Utilities                 = (BAR and BAR.Utilities) or Spring.Utilities -- BAR 2026.08+ compatibility
 ---------------------------------------------------------------------------------
 --Drawing and Scaling
 ---------------------------------------------------------------------------------
@@ -258,7 +259,7 @@ end
 
 local function FindAllPlayersOnAllyTeam() --creates a list with all allys per team, inc players and AI, stores colours too.
     allyTeamList ={}
-    local numberOfTeams = Spring.Utilities.GetAllyTeamCount()
+    local numberOfTeams = Utilities.GetAllyTeamCount()
     for i= 0, numberOfTeams-1 do --all"real" teams (no gaia (or raptors?))
         local counter = 1
         for _,teamID in pairs(Spring.GetTeamList(i)) do
